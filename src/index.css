@@ -1,0 +1,174 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #2e7df6;
+  --color-brand-600: #155eef;
+  --color-brand-700: #124bce;
+  --color-brand-800: #173ea5;
+  --color-brand-900: #193b82;
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+:root {
+  font-family: var(--font-sans);
+  color: #101828;
+  background: #f7f9fc;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+html.dark {
+  color: #e5e7eb;
+  background: #080d18;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input, textarea, select { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+
+::selection { background: #bfdbfe; color: #173ea5; }
+
+.card {
+  border: 1px solid #e4e7ec;
+  border-radius: 1.25rem;
+  background: white;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.03);
+}
+
+html.dark .card {
+  border-color: #263244;
+  background: #111827;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
+}
+
+.focus-ring:focus-visible {
+  outline: 3px solid rgb(46 125 246 / 0.2);
+  outline-offset: 2px;
+}
+
+.markdown { color: #344054; line-height: 1.8; overflow-wrap: anywhere; }
+.markdown h1 { color: #101828; font-size: 1.75rem; line-height: 1.3; font-weight: 800; margin: 0 0 1.25rem; letter-spacing: -0.03em; }
+.markdown h2 { color: #101828; font-size: 1.3rem; font-weight: 750; margin: 2rem 0 .8rem; letter-spacing: -0.02em; }
+.markdown h3 { color: #101828; font-size: 1.1rem; font-weight: 700; margin: 1.5rem 0 .6rem; }
+.markdown p { margin: .75rem 0; }
+.markdown ul, .markdown ol { padding-left: 1.4rem; margin: .8rem 0; }
+.markdown ul { list-style: disc; }
+.markdown ol { list-style: decimal; }
+.markdown li { margin: .3rem 0; }
+.markdown strong { color: #101828; font-weight: 750; }
+.markdown blockquote { margin: 1.2rem 0; padding: .8rem 1rem; border-left: 4px solid #2e7df6; background: #eff6ff; color: #173ea5; border-radius: 0 .75rem .75rem 0; }
+.markdown table { width: 100%; border-collapse: collapse; margin: 1.2rem 0; font-size: .9rem; }
+.markdown th, .markdown td { border: 1px solid #e4e7ec; padding: .65rem .75rem; text-align: left; }
+.markdown th { background: #f9fafb; color: #344054; font-weight: 700; }
+.markdown code { background: #f2f4f7; border-radius: .35rem; padding: .15rem .35rem; font-size: .88em; }
+.markdown a { color: #155eef; text-decoration: underline; text-underline-offset: 3px; }
+
+/* The app starts in dark mode. These mappings keep the existing design tokens
+   consistent across cards, overlays, forms, badges, and table content. */
+html.dark .bg-white { background-color: #111827; }
+html.dark .bg-white\/90 { background-color: rgb(15 23 42 / .90); }
+html.dark .bg-white\/95 { background-color: rgb(15 23 42 / .95); }
+html.dark .bg-gray-50 { background-color: #151e2d; }
+html.dark .bg-gray-100 { background-color: #1e293b; }
+html.dark .bg-gray-200 { background-color: #334155; }
+html.dark .bg-gray-300 { background-color: #475569; }
+
+html.dark .text-gray-950,
+html.dark .text-gray-900,
+html.dark .text-gray-800 { color: #f1f5f9; }
+html.dark .text-gray-700 { color: #e2e8f0; }
+html.dark .text-gray-600 { color: #cbd5e1; }
+html.dark .text-gray-500 { color: #94a3b8; }
+html.dark .text-gray-400 { color: #7f8da3; }
+
+html.dark .border-gray-100 { border-color: #202c3d; }
+html.dark .border-gray-200,
+html.dark .border-gray-200\/80 { border-color: #2a374a; }
+html.dark .border-gray-300 { border-color: #475569; }
+html.dark .border-brand-100 { border-color: #17356d; }
+html.dark .border-brand-200 { border-color: #1d4b91; }
+html.dark .border-brand-300 { border-color: #3478d4; }
+
+html.dark .bg-brand-50,
+html.dark .bg-brand-50\/50,
+html.dark .bg-brand-50\/60 { background-color: rgb(21 94 239 / .14); }
+html.dark .bg-brand-100 { background-color: rgb(46 125 246 / .22); }
+html.dark .bg-brand-200\/35,
+html.dark .bg-brand-200\/40 { background-color: rgb(46 125 246 / .18); }
+html.dark .text-brand-900,
+html.dark .text-brand-700,
+html.dark .text-brand-700\/70 { color: #8bbcff; }
+html.dark .text-brand-600 { color: #63a0ff; }
+
+html.dark .bg-red-50 { background-color: rgb(239 68 68 / .13); }
+html.dark .bg-red-100 { background-color: rgb(239 68 68 / .2); }
+html.dark .text-red-700,
+html.dark .text-red-600 { color: #fca5a5; }
+html.dark .bg-emerald-50 { background-color: rgb(16 185 129 / .13); }
+html.dark .text-emerald-800,
+html.dark .text-emerald-700,
+html.dark .text-emerald-600 { color: #6ee7b7; }
+html.dark .bg-amber-50 { background-color: rgb(245 158 11 / .13); }
+html.dark .text-amber-900,
+html.dark .text-amber-800 { color: #fcd34d; }
+html.dark .border-amber-200 { border-color: rgb(245 158 11 / .34); }
+html.dark .bg-orange-50 { background-color: rgb(249 115 22 / .13); }
+html.dark .text-orange-700 { color: #fdba74; }
+html.dark .bg-violet-50 { background-color: rgb(139 92 246 / .15); }
+html.dark .text-violet-900,
+html.dark .text-violet-700,
+html.dark .text-violet-600 { color: #c4b5fd; }
+
+html.dark .from-brand-50 { --tw-gradient-from: #0b1830; }
+html.dark .via-white { --tw-gradient-via: #0b1220; }
+html.dark .to-white { --tw-gradient-to: #0b1220; }
+html.dark .to-blue-50 { --tw-gradient-to: #0b1730; }
+html.dark .shadow-brand-100\/60,
+html.dark .shadow-brand-200,
+html.dark .shadow-brand-200\/40,
+html.dark .shadow-brand-200\/50 { --tw-shadow-color: rgb(0 0 0 / .3); }
+
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover { background-color: #1e293b; }
+html.dark .hover\:text-gray-900:hover { color: #f8fafc; }
+html.dark .hover\:bg-brand-50:hover { background-color: rgb(21 94 239 / .2); }
+
+html.dark input,
+html.dark textarea,
+html.dark select { caret-color: #60a5fa; }
+html.dark input[type="color"] { background-color: #111827; }
+html.dark ::placeholder { color: #64748b; }
+
+html.dark .markdown { color: #cbd5e1; }
+html.dark .markdown h1,
+html.dark .markdown h2,
+html.dark .markdown h3,
+html.dark .markdown strong { color: #f1f5f9; }
+html.dark .markdown blockquote { border-left-color: #60a5fa; background: rgb(21 94 239 / .13); color: #a9caff; }
+html.dark .markdown th,
+html.dark .markdown td { border-color: #334155; }
+html.dark .markdown th { background: #182235; color: #dbe4f0; }
+html.dark .markdown code { background: #1e293b; }
+html.dark .markdown a { color: #7fb2ff; }
+
+.safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up .35s ease-out both; }
+
+@media (max-width: 767px) {
+  .markdown h1 { font-size: 1.5rem; }
+  .markdown table { display: block; overflow-x: auto; }
+}

@@ -1,0 +1,128 @@
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import type { Profile } from '../types'
+import { isSupabaseConfigured, supabase } from '../lib/supabase'
+
+interface AuthContextValue {
+  profile: Profile | null
+  loading: boolean
+  configured: boolean
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (name: string, studentNumber: string, email: string, password: string) => Promise<{ requiresEmailConfirmation: boolean }>
+  signOut: () => Promise<void>
+  refreshProfile: () => Promise<void>
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null)
+
+const mapProfile = (row: any): Profile => ({
+  id: row.id,
+  email: row.email,
+  name: row.name,
+  studentNumber: row.student_number ?? undefined,
+  role: row.role,
+  avatarUrl: row.avatar_url ?? undefined,
+  isActive: row.is_active,
+})
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const loadProfile = async (userId?: string) => {
+    if (!supabase) {
+      setProfile(null)
+      return
+    }
+    const id = userId ?? (await supabase.auth.getUser()).data.user?.id
+    if (!id) {
+      setProfile(null)
+      return
+    }
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', id).single()
+    if (error) throw new Error('프로필을 불러오지 못했습니다. Supabase 초기 SQL을 먼저 실행해주세요.')
+    if (!data.is_active) {
+      await supabase.auth.signOut()
+      throw new Error('비활성화된 계정입니다. 관리자에게 문의해주세요.')
+    }
+    setProfile(mapProfile(data))
+  }
+
+  useEffect(() => {
+    if (!supabase) {
+      setLoading(false)
+      return
+    }
+
+    supabase.auth.getSession().then(async ({ data }) => {
+      try {
+        if (data.session?.user) await loadProfile(data.session.user.id)
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setLoading(false)
+      }
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') setProfile(null)
+      if (event === 'SIGNED_IN' && session?.user) {
+        window.setTimeout(() => loadProfile(session.user.id).catch(console.error), 0)
+      }
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  const signIn = async (email: string, password: string) => {
+    if (!supabase) throw new Error('Supabase 환경변수가 설정되지 않았습니다.')
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw new Error('이메일 또는 비밀번호를 확인해주세요.')
+    await loadProfile(data.user.id)
+  }
+
+  const signUp = async (name: string, studentNumber: string, email: string, password: string) => {
+    if (!supabase) throw new Error('Supabase 환경변수가 설정되지 않았습니다.')
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: name.trim(),
+          student_number: studentNumber.trim(),
+        },
+      },
+    })
+    if (error) {
+      if (error.message.toLowerCase().includes('already registered')) throw new Error('이미 가입된 이메일입니다.')
+      if (error.message.toLowerCase().includes('password')) throw new Error('비밀번호가 보안 기준을 충족하지 않습니다.')
+      throw new Error(error.message || '회원가입하지 못했습니다.')
+    }
+    if (data.session && data.user) {
+      await new Promise((resolve) => window.setTimeout(resolve, 150))
+      await loadProfile(data.user.id)
+    }
+    return { requiresEmailConfirmation: !data.session }
+  }
+
+  const signOut = async () => {
+    if (supabase) await supabase.auth.signOut()
+    setProfile(null)
+  }
+
+  const value: AuthContextValue = {
+    profile,
+    loading,
+    configured: isSupabaseConfigured,
+    signIn,
+    signUp,
+    signOut,
+    refreshProfile: () => loadProfile(),
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (!context) throw new Error('useAuth는 AuthProvider 안에서 사용해야 합니다.')
+  return context
+}
