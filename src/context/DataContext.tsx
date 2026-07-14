@@ -6,12 +6,14 @@ import type {
   ApplicationStatus,
   Club,
   ClubApplication,
+  DemoStore,
   Profile,
   RecruitmentSettings,
 } from '../types'
-import { supabase } from '../lib/supabase'
+import { isDemoMode, supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { uid } from '../lib/utils'
+import { createDemoStore } from '../data/demo'
 
 interface DataContextValue {
   clubs: Club[]
@@ -38,6 +40,19 @@ interface DataContextValue {
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
+const demoStoreKey = 'surfing-fake:demo-store:v1'
+
+const readDemoStore = (): DemoStore => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(demoStoreKey) || 'null')
+    if (saved?.clubs && saved?.settings) return saved
+  } catch { /* use a fresh demo */ }
+  const fresh = createDemoStore()
+  localStorage.setItem(demoStoreKey, JSON.stringify(fresh))
+  return fresh
+}
+
+const writeDemoStore = (store: DemoStore) => localStorage.setItem(demoStoreKey, JSON.stringify(store))
 
 const mapClub = (row: any): Club => ({
   id: row.id,
@@ -103,7 +118,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const applyDemoStore = (store: DemoStore) => {
+    const withCurrentProfile = profile && !store.profiles.some((item) => item.id === profile.id)
+      ? { ...store, profiles: [...store.profiles, profile] }
+      : store
+    if (withCurrentProfile !== store) writeDemoStore(withCurrentProfile)
+    setClubs(withCurrentProfile.clubs)
+    setQuestions(withCurrentProfile.questions)
+    setApplications(withCurrentProfile.applications)
+    setProfiles(withCurrentProfile.profiles)
+    setFavoriteClubIds(profile ? withCurrentProfile.favorites[profile.id] || [] : [])
+    setNotifications(profile ? withCurrentProfile.notifications.filter((item) => item.userId === profile.id) : [])
+    setSettings(withCurrentProfile.settings)
+    setError(null)
+    setLoading(false)
+  }
+
+  const updateDemoStore = (update: (store: DemoStore) => DemoStore) => {
+    const next = update(readDemoStore())
+    writeDemoStore(next)
+    applyDemoStore(next)
+    return next
+  }
+
   const reload = async () => {
+    if (isDemoMode) {
+      applyDemoStore(readDemoStore())
+      return
+    }
     if (!supabase) {
       setLoading(false)
       return
@@ -170,6 +212,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [profile?.id])
 
   const toggleFavorite = async (clubId: string) => {
+    if (isDemoMode) {
+      if (!profile) throw new Error('로그인이 필요합니다.')
+      updateDemoStore((store) => {
+        const current = store.favorites[profile.id] || []
+        const next = current.includes(clubId) ? current.filter((id) => id !== clubId) : [...current, clubId]
+        return { ...store, favorites: { ...store.favorites, [profile.id]: next } }
+      })
+      return
+    }
     if (!supabase || !profile) throw new Error('로그인이 필요합니다.')
     if (favoriteClubIds.includes(clubId)) {
       const { error } = await supabase.from('favorites').delete().eq('user_id', profile.id).eq('club_id', clubId)
@@ -194,6 +245,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const saveDraft = async (clubId: string, answers: Record<string, AnswerValue>) => {
+    if (isDemoMode) {
+      if (!profile) throw new Error('로그인이 필요합니다.')
+      const store = readDemoStore()
+      const existing = store.applications.find((app) => app.clubId === clubId && app.userId === profile.id)
+      const draft: ClubApplication = {
+        id: existing?.id || uid(),
+        clubId,
+        userId: profile.id,
+        status: 'draft',
+        answers,
+        updatedAt: new Date().toISOString(),
+      }
+      updateDemoStore((current) => ({
+        ...current,
+        applications: [...current.applications.filter((app) => app.id !== draft.id), draft],
+      }))
+      return draft
+    }
     if (!supabase || !profile) throw new Error('로그인이 필요합니다.')
     const existing = applications.find((app) => app.clubId === clubId && app.userId === profile.id)
     let applicationId = existing?.id
@@ -221,6 +290,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const submitApplication = async (clubId: string, answers: Record<string, AnswerValue>) => {
+    if (isDemoMode) {
+      const draft = await saveDraft(clubId, answers)
+      updateDemoStore((store) => ({
+        ...store,
+        applications: store.applications.map((app) => app.id === draft.id
+          ? { ...app, status: 'submitted', submittedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+          : app),
+      }))
+      return
+    }
     if (!supabase || !profile) throw new Error('로그인이 필요합니다.')
     const draft = await saveDraft(clubId, answers)
     const { error } = await supabase
@@ -232,6 +311,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const setApplicationStatus = async (applicationId: string, status: ApplicationStatus) => {
+    if (isDemoMode) {
+      updateDemoStore((store) => ({
+        ...store,
+        applications: store.applications.map((app) => app.id === applicationId
+          ? { ...app, status, updatedAt: new Date().toISOString() }
+          : app),
+      }))
+      return
+    }
     if (!supabase || !profile) return
     if (status === 'accepted' || status === 'rejected') {
       const { error } = await supabase.from('application_decisions').upsert(
@@ -252,6 +340,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const updateClub = async (clubId: string, values: Partial<Club>) => {
+    if (isDemoMode) {
+      updateDemoStore((store) => ({
+        ...store,
+        clubs: store.clubs.map((club) => club.id === clubId ? { ...club, ...values } : club),
+      }))
+      return
+    }
     if (!supabase) return
     const payload: Record<string, unknown> = {}
     if (values.name !== undefined) payload.name = values.name
@@ -268,6 +363,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const createClub = async (values: Pick<Club, 'name' | 'category' | 'summary' | 'description' | 'capacity' | 'color'>) => {
+    if (isDemoMode) {
+      if (!profile) throw new Error('로그인이 필요합니다.')
+      const club: Club = {
+        ...values,
+        id: uid(),
+        leaderId: profile.id,
+        leaderName: profile.name,
+        isPublished: true,
+        createdAt: new Date().toISOString(),
+      }
+      updateDemoStore((store) => ({ ...store, clubs: [...store.clubs, club] }))
+      return club
+    }
     if (!supabase || !profile) throw new Error('로그인이 필요합니다.')
     const { data, error } = await supabase
       .from('clubs')
@@ -290,6 +398,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const replaceQuestions = async (clubId: string, newQuestions: ApplicationQuestion[]) => {
+    if (isDemoMode) {
+      updateDemoStore((store) => ({
+        ...store,
+        questions: [...store.questions.filter((question) => question.clubId !== clubId), ...newQuestions],
+      }))
+      return
+    }
     if (!supabase) return
     const { error: deleteError } = await supabase.from('application_questions').delete().eq('club_id', clubId)
     if (deleteError) throw deleteError
@@ -312,6 +427,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const updateSettings = async (next: RecruitmentSettings) => {
+    if (isDemoMode) {
+      updateDemoStore((store) => ({ ...store, settings: next }))
+      return
+    }
     if (!supabase) return
     const { error } = await supabase
       .from('recruitment_settings')
@@ -327,6 +446,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const promoteStudentToLeader = async (profileId: string) => {
+    if (isDemoMode) {
+      updateDemoStore((store) => ({
+        ...store,
+        profiles: store.profiles.map((item) => item.id === profileId ? { ...item, role: 'leader' } : item),
+      }))
+      return
+    }
     if (!supabase) return
     const { data, error } = await supabase
       .from('profiles')
@@ -340,6 +466,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const markNotificationRead = async (notificationId: string) => {
+    if (isDemoMode) {
+      updateDemoStore((store) => ({
+        ...store,
+        notifications: store.notifications.map((item) => item.id === notificationId ? { ...item, read: true } : item),
+      }))
+      return
+    }
     if (!supabase) return
     const { error } = await supabase.from('notifications').update({ read: true }).eq('id', notificationId)
     if (error) throw error
@@ -347,6 +480,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const uploadClubLogo = async (clubId: string, file: File) => {
+    if (isDemoMode) {
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(new Error('이미지를 읽지 못했습니다.'))
+        reader.readAsDataURL(file)
+      })
+    }
     if (!supabase) throw new Error('Supabase 연결이 필요합니다.')
     const extension = file.name.split('.').pop()?.toLowerCase() || 'png'
     const path = `${clubId}/logo-${Date.now()}.${extension}`

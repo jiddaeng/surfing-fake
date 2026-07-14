@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim()
 
+export const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
+
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
     supabaseKey &&

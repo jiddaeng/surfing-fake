@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Profile } from '../types'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { isDemoMode, isSupabaseConfigured, supabase } from '../lib/supabase'
+import { DEMO_ACCOUNTS } from '../data/demo'
 
 interface AuthContextValue {
   profile: Profile | null
@@ -13,6 +14,17 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+const demoSessionKey = 'surfing-fake:demo-session'
+const demoAccountsKey = 'surfing-fake:demo-accounts'
+
+const demoAccounts = () => {
+  try {
+    const custom = JSON.parse(localStorage.getItem(demoAccountsKey) || '[]')
+    return [...DEMO_ACCOUNTS, ...(Array.isArray(custom) ? custom : [])]
+  } catch {
+    return DEMO_ACCOUNTS
+  }
+}
 
 const mapProfile = (row: any): Profile => ({
   id: row.id,
@@ -29,6 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const loadProfile = async (userId?: string) => {
+    if (isDemoMode) {
+      const id = userId || localStorage.getItem(demoSessionKey)
+      const account = demoAccounts().find((item) => item.id === id)
+      setProfile(account ? { ...account, password: undefined } : null)
+      return
+    }
     if (!supabase) {
       setProfile(null)
       return
@@ -48,6 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    if (isDemoMode) {
+      loadProfile().finally(() => setLoading(false))
+      return
+    }
     if (!supabase) {
       setLoading(false)
       return
@@ -73,6 +95,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signIn = async (email: string, password: string) => {
+    if (isDemoMode) {
+      const account = demoAccounts().find((item) => item.email.toLowerCase() === email.trim().toLowerCase() && item.password === password)
+      if (!account) throw new Error('이메일 또는 비밀번호를 확인해주세요.')
+      localStorage.setItem(demoSessionKey, account.id)
+      const { password: _password, ...nextProfile } = account
+      void _password
+      setProfile(nextProfile)
+      return
+    }
     if (!supabase) throw new Error('Supabase 환경변수가 설정되지 않았습니다.')
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error('이메일 또는 비밀번호를 확인해주세요.')
@@ -80,6 +111,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signUp = async (name: string, studentNumber: string, email: string, password: string) => {
+    if (isDemoMode) {
+      const normalizedEmail = email.trim().toLowerCase()
+      if (demoAccounts().some((item) => item.email.toLowerCase() === normalizedEmail)) throw new Error('이미 가입된 이메일입니다.')
+      const account = {
+        id: crypto.randomUUID(),
+        email: normalizedEmail,
+        password,
+        name: name.trim(),
+        studentNumber: studentNumber.trim(),
+        role: 'student' as const,
+        isActive: true,
+      }
+      const custom = demoAccounts().filter((item) => !DEMO_ACCOUNTS.some((base) => base.id === item.id))
+      localStorage.setItem(demoAccountsKey, JSON.stringify([...custom, account]))
+      localStorage.setItem(demoSessionKey, account.id)
+      const { password: _password, ...nextProfile } = account
+      void _password
+      setProfile(nextProfile)
+      return { requiresEmailConfirmation: false }
+    }
     if (!supabase) throw new Error('Supabase 환경변수가 설정되지 않았습니다.')
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -104,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    if (isDemoMode) localStorage.removeItem(demoSessionKey)
     if (supabase) await supabase.auth.signOut()
     setProfile(null)
   }
@@ -111,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextValue = {
     profile,
     loading,
-    configured: isSupabaseConfigured,
+    configured: isDemoMode || isSupabaseConfigured,
     signIn,
     signUp,
     signOut,
