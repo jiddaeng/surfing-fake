@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Brand } from '../components/Layout'
@@ -14,7 +14,6 @@ export function SignupPage() {
   const [agreed, setAgreed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [confirmationEmail, setConfirmationEmail] = useState('')
 
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }))
 
@@ -29,28 +28,13 @@ export function SignupPage() {
 
     setLoading(true)
     try {
-      const result = await signUp(form.name, form.studentNumber, form.email.trim(), form.password)
-      if (result.requiresEmailConfirmation) setConfirmationEmail(form.email.trim())
-      else navigate('/dashboard', { replace: true })
+      await signUp(form.name, form.studentNumber, form.email.trim(), form.password)
+      navigate('/dashboard', { replace: true })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '회원가입하지 못했습니다.')
     } finally {
       setLoading(false)
     }
-  }
-
-  if (confirmationEmail) {
-    return (
-      <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-50 via-white to-blue-50 px-4 py-8">
-        <div className="absolute right-4 top-4"><ThemeToggle /></div>
-        <div className="card w-full max-w-md rounded-[1.75rem] p-7 text-center shadow-xl shadow-brand-100/60 sm:p-9">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"><CheckCircle2 size={27} /></div>
-          <h1 className="mt-5 text-2xl font-black tracking-tight">이메일을 확인해주세요</h1>
-          <p className="mt-3 text-sm leading-6 text-gray-500"><strong className="text-gray-800">{confirmationEmail}</strong>로 인증 메일을 보냈어요. 이메일 인증을 마치면 로그인할 수 있습니다.</p>
-          <Link to="/login" className="mt-7 block"><Button size="lg" className="w-full">로그인 화면으로</Button></Link>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -68,10 +52,10 @@ export function SignupPage() {
               <label className="block"><span className="mb-2 block text-sm font-semibold">이름</span><input value={form.name} onChange={(e) => update('name', e.target.value)} className={inputClass} placeholder="홍길동" maxLength={20} required /></label>
               <label className="block"><span className="mb-2 block text-sm font-semibold">학번</span><input value={form.studentNumber} onChange={(e) => update('studentNumber', e.target.value.replace(/\D/g, '').slice(0, 4))} className={inputClass} placeholder="예: 1301" inputMode="numeric" maxLength={4} required /></label>
             </div>
-            <label className="block"><span className="mb-2 block text-sm font-semibold">이메일</span><div className="relative"><Mail size={17} className="absolute left-3.5 top-3.5 text-gray-400" /><input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} className={`${inputClass} pl-10`} placeholder="이메일 주소" autoComplete="email" required /></div></label>
+            <label className="block"><span className="mb-2 block text-sm font-semibold">이메일 또는 로그인 ID</span><div className="relative"><Mail size={17} className="absolute left-3.5 top-3.5 text-gray-400" /><input type="text" value={form.email} onChange={(e) => update('email', e.target.value)} className={`${inputClass} pl-10`} placeholder="형식 제한 없이 입력" autoComplete="username" required /></div></label>
             <label className="block"><span className="mb-2 block text-sm font-semibold">비밀번호</span><div className="relative"><LockKeyhole size={17} className="absolute left-3.5 top-3.5 text-gray-400" /><input type={showPassword ? 'text' : 'password'} value={form.password} onChange={(e) => update('password', e.target.value)} className={`${inputClass} px-10`} placeholder="8자 이상 입력" autoComplete="new-password" minLength={8} required /><button type="button" onClick={() => setShowPassword((show) => !show)} className="absolute right-3 top-3 text-gray-400" aria-label="비밀번호 표시 전환">{showPassword ? <EyeOff size={19} /> : <Eye size={19} />}</button></div></label>
             <label className="block"><span className="mb-2 block text-sm font-semibold">비밀번호 확인</span><input type={showPassword ? 'text' : 'password'} value={form.confirmPassword} onChange={(e) => update('confirmPassword', e.target.value)} className={inputClass} placeholder="비밀번호를 한 번 더 입력" autoComplete="new-password" required /></label>
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-gray-50 p-3.5 text-xs leading-5 text-gray-600"><input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-1 accent-brand-600" /><span><strong className="text-gray-800">개인정보 수집 및 이용에 동의합니다.</strong><br />동아리 지원을 위해 이름, 학번, 이메일을 저장합니다.</span></label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-gray-50 p-3.5 text-xs leading-5 text-gray-600"><input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-1 accent-brand-600" /><span><strong className="text-gray-800">개인정보 수집 및 이용에 동의합니다.</strong><br />동아리 지원을 위해 이름, 학번, 로그인 ID를 저장합니다.</span></label>
             {error && <p className="rounded-xl bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">{error}</p>}
             <Button type="submit" size="lg" loading={loading} className="w-full">학생 계정 만들기</Button>
           </form>
