@@ -32,6 +32,7 @@ interface DataContextValue {
   createClub: (values: Pick<Club, 'name' | 'category' | 'summary' | 'description' | 'capacity' | 'color'>) => Promise<Club>
   replaceQuestions: (clubId: string, questions: ApplicationQuestion[]) => Promise<void>
   updateSettings: (settings: RecruitmentSettings) => Promise<void>
+  promoteStudentToLeader: (profileId: string) => Promise<void>
   markNotificationRead: (notificationId: string) => Promise<void>
   uploadClubLogo: (clubId: string, file: File) => Promise<string>
 }
@@ -325,6 +326,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setSettings(next)
   }
 
+  const promoteStudentToLeader = async (profileId: string) => {
+    if (!supabase) return
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ role: 'leader' })
+      .eq('id', profileId)
+      .eq('role', 'student')
+      .select()
+      .single()
+    if (error) throw error
+    setProfiles((items) => items.map((item) => (item.id === profileId ? mapProfile(data) : item)))
+  }
+
   const markNotificationRead = async (notificationId: string) => {
     if (!supabase) return
     const { error } = await supabase.from('notifications').update({ read: true }).eq('id', notificationId)
@@ -361,6 +375,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       createClub,
       replaceQuestions,
       updateSettings,
+      promoteStudentToLeader,
       markNotificationRead,
       uploadClubLogo,
     }),

@@ -43,9 +43,9 @@ export function LandingPage() {
               <div className="mt-5 flex items-center justify-between"><strong className="text-sm">지금 주목받는 동아리</strong><span className="text-xs font-bold text-brand-600">전체보기</span></div>
               <div className="mt-3 space-y-2.5">
                 {(clubs.length ? clubs.slice(0, 3) : [
-                  { id: '1', name: '플레이스테이션', summary: '웹·앱 개발', category: '전공', color: '#155eef' },
-                  { id: '2', name: '인피니티', summary: '인공지능 연구', category: '전공', color: '#0e9384' },
-                  { id: '3', name: 'DIMI SOUND', summary: '교내 밴드', category: '문화예술', color: '#e04f16' },
+                  { id: '1', name: '저스트', summary: '동아리 소개 준비 중', category: '전공', color: '#155eef' },
+                  { id: '2', name: '루나', summary: '동아리 소개 준비 중', category: '전공', color: '#7c3aed' },
+                  { id: '3', name: '임플루드', summary: '동아리 소개 준비 중', category: '전공', color: '#0e9384' },
                 ] as any[]).map((club) => (
                   <div key={club.id} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
                     <ClubLogo club={{ ...club, logoUrl: undefined } as any} size="sm" />
@@ -56,7 +56,7 @@ export function LandingPage() {
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-brand-600 p-4 text-white"><p className="text-xs text-brand-100">모집 마감까지</p><p className="mt-1 text-2xl font-black">D-7</p></div>
-                <div className="rounded-2xl bg-gray-900 p-4 text-white"><p className="text-xs text-gray-400">등록 동아리</p><p className="mt-1 text-2xl font-black">{clubs.length || 8}<span className="ml-1 text-sm">개</span></p></div>
+                <div className="rounded-2xl bg-gray-900 p-4 text-white"><p className="text-xs text-gray-400">등록 동아리</p><p className="mt-1 text-2xl font-black">{clubs.length || 9}<span className="ml-1 text-sm">개</span></p></div>
               </div>
             </div>
           </div>

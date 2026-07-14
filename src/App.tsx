@@ -2,7 +2,6 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/Layout'
 import { useAuth } from './context/AuthContext'
 import type { Role } from './types'
-import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { SignupPage } from './pages/SignupPage'
 import { ClubsPage } from './pages/ClubsPage'
@@ -31,7 +30,7 @@ function Protected({ roles }: { roles: Role[] }) {
 
 function HomeRedirect() {
   const { profile } = useAuth()
-  if (!profile) return <LandingPage />
+  if (!profile) return <ClubsPage />
   return <Navigate to={profile.role === 'student' ? '/dashboard' : profile.role === 'leader' ? '/leader' : '/admin'} replace />
 }
 

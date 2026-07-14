@@ -66,14 +66,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
             <Brand />
             <div className="flex items-center gap-2">
-              <Link to="/clubs" className="hidden px-3 py-2 text-sm font-semibold text-gray-600 sm:block">동아리 둘러보기</Link>
               <ThemeToggle />
               <Link to="/login"><Button size="sm">로그인</Button></Link>
             </div>
           </div>
         </header>
         {error && <ErrorBanner message={error} />}
-        {children}
+        <main className="animate-fade-up mx-auto max-w-[1440px] px-4 pb-12 pt-6 sm:px-6 sm:pt-8 lg:px-8">{children}</main>
       </div>
     )
   }

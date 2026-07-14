@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, Building2, CalendarClock, CheckCircle2, Save, Users } from 'lucide-react'
+import { BarChart3, Building2, CalendarClock, CheckCircle2, Save, ShieldCheck, Users } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import type { RecruitmentSettings } from '../types'
 import { ROLE_LABEL } from '../types'
@@ -7,10 +7,12 @@ import { Badge, Button, inputClass } from '../components/ui'
 import { formatFullDate, toDateTimeLocal } from '../lib/utils'
 
 export function AdminDashboard() {
-  const { clubs, applications, profiles, settings, updateSettings } = useData()
+  const { clubs, applications, profiles, settings, updateSettings, promoteStudentToLeader } = useData()
   const [schedule, setSchedule] = useState<RecruitmentSettings | null>(settings)
   const [saving, setSaving] = useState(false)
+  const [promotingId, setPromotingId] = useState('')
   const [message, setMessage] = useState('')
+  const [roleMessage, setRoleMessage] = useState('')
   useEffect(() => setSchedule(settings), [settings])
 
   const submitted = applications.filter((app) => app.status !== 'draft')
@@ -23,6 +25,7 @@ export function AdminDashboard() {
   ] as const
   const clubStats = useMemo(() => clubs.map((club) => ({ club, count: submitted.filter((app) => app.clubId === club.id).length })).sort((a, b) => b.count - a.count), [clubs, submitted])
   const maxCount = Math.max(1, ...clubStats.map((item) => item.count))
+  const students = useMemo(() => profiles.filter((item) => item.role === 'student').sort((a, b) => a.name.localeCompare(b.name, 'ko')), [profiles])
 
   const saveSchedule = async () => {
     if (!schedule) return
@@ -31,6 +34,20 @@ export function AdminDashboard() {
     try { await updateSettings(schedule); setMessage('모집 일정을 저장했어요.') }
     catch (error) { setMessage(error instanceof Error ? error.message : '일정을 저장하지 못했습니다.') }
     finally { setSaving(false) }
+  }
+
+  const promote = async (profileId: string) => {
+    const target = profiles.find((item) => item.id === profileId)
+    if (!target) return
+    setPromotingId(profileId); setRoleMessage('')
+    try {
+      await promoteStudentToLeader(profileId)
+      setRoleMessage(`${target.name} 계정을 동아리장으로 승급했어요.`)
+    } catch (error) {
+      setRoleMessage(error instanceof Error ? error.message : '계정 역할을 변경하지 못했습니다.')
+    } finally {
+      setPromotingId('')
+    }
   }
 
   return (
@@ -43,6 +60,30 @@ export function AdminDashboard() {
 
         <section className="card p-5 sm:p-6"><div className="flex items-center gap-2"><CalendarClock size={19} className="text-brand-600" /><h2 className="font-black">공통 모집 일정</h2></div>{schedule && <div className="mt-5 space-y-4"><label className="block"><span className="mb-2 block text-xs font-bold text-gray-600">모집 시작</span><input type="datetime-local" value={toDateTimeLocal(schedule.recruitmentStartAt)} onChange={(e) => setSchedule({ ...schedule, recruitmentStartAt: new Date(e.target.value).toISOString() })} className={inputClass} /></label><label className="block"><span className="mb-2 block text-xs font-bold text-gray-600">모집 마감</span><input type="datetime-local" value={toDateTimeLocal(schedule.recruitmentEndAt)} onChange={(e) => setSchedule({ ...schedule, recruitmentEndAt: new Date(e.target.value).toISOString() })} className={inputClass} /></label><label className="block"><span className="mb-2 block text-xs font-bold text-gray-600">합격 발표</span><input type="datetime-local" value={toDateTimeLocal(schedule.resultAnnouncementAt)} onChange={(e) => setSchedule({ ...schedule, resultAnnouncementAt: new Date(e.target.value).toISOString() })} className={inputClass} /></label><label className="block"><span className="mb-2 block text-xs font-bold text-gray-600">학생별 최대 지원 수</span><input type="number" min={1} max={10} value={schedule.maxApplications} onChange={(e) => setSchedule({ ...schedule, maxApplications: Number(e.target.value) })} className={inputClass} /></label>{message && <p className={`rounded-xl px-3 py-2 text-xs font-medium ${message.includes('저장했') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{message}</p>}<Button onClick={saveSchedule} loading={saving} className="w-full"><Save size={16} /> 일정 저장</Button></div>}</section>
       </div>
+
+      <section className="mt-8">
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+          <div>
+            <h2 className="text-lg font-black">계정 역할 관리</h2>
+            <p className="mt-1 text-sm text-gray-500">학생 계정을 동아리장으로 승급해 새 동아리 등록 권한을 부여합니다.</p>
+          </div>
+          <Badge tone="blue">학생 {students.length}명</Badge>
+        </div>
+        {roleMessage && <p className={`mt-3 rounded-xl px-4 py-3 text-sm font-medium ${roleMessage.includes('승급했') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{roleMessage}</p>}
+        <div className="card mt-3 overflow-hidden">
+          {students.length ? students.map((student) => (
+            <div key={student.id} className="flex flex-col gap-3 border-b border-gray-100 p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <strong className="block truncate text-sm text-gray-800">{student.name}</strong>
+                <span className="mt-0.5 block truncate text-xs text-gray-500">{student.studentNumber ?? '학번 미설정'} · {student.email}</span>
+              </div>
+              <Button size="sm" variant="secondary" onClick={() => promote(student.id)} loading={promotingId === student.id}>
+                <ShieldCheck size={15} /> 동아리장으로 승급
+              </Button>
+            </div>
+          )) : <p className="px-5 py-12 text-center text-sm text-gray-500">승급할 학생 계정이 없어요.</p>}
+        </div>
+      </section>
 
       <section className="mt-8"><div className="flex items-center justify-between"><h2 className="text-lg font-black">사용자 및 지원 현황</h2><p className="text-xs text-gray-500">지원서 답변 내용은 동아리장만 볼 수 있어요.</p></div><div className="card mt-3 overflow-x-auto"><table className="w-full min-w-[680px] text-left"><thead className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500"><tr><th className="px-5 py-3 font-semibold">사용자</th><th className="px-5 py-3 font-semibold">역할</th><th className="px-5 py-3 font-semibold">지원 동아리</th><th className="px-5 py-3 font-semibold">상태</th><th className="px-5 py-3 font-semibold">제출 시각</th></tr></thead><tbody className="divide-y divide-gray-100">{submitted.map((app) => {
         const user = profiles.find((item) => item.id === app.userId); const club = clubs.find((item) => item.id === app.clubId)

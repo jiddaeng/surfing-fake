@@ -9,6 +9,7 @@ import { ThemeToggle } from '../components/ThemeToggle'
 const demoAccounts = [
   { role: '학생', email: 'student@dimigo.hs.kr', color: 'bg-brand-50 text-brand-700' },
   { role: '동아리장', email: 'leader@dimigo.hs.kr', color: 'bg-violet-50 text-violet-700' },
+  { role: '신규 동아리장', email: 'newleader@dimigo.hs.kr', color: 'bg-sky-50 text-sky-700' },
   { role: '관리자', email: 'admin@dimigo.hs.kr', color: 'bg-gray-100 text-gray-700' },
 ]
 
