@@ -12,6 +12,13 @@ export interface Profile {
   isActive: boolean
 }
 
+export interface PendingAccount {
+  id: string
+  name: string
+  studentNumber?: string
+  requestedAt: string
+}
+
 export interface Club {
   id: string
   name: string

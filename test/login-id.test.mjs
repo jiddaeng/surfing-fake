@@ -45,3 +45,23 @@ test('deployed login offers isolated demo accounts with the requested password',
   assert.match(auth, /return \{ requiresReload: true \}/)
   assert.match(supabaseClient, /Demo roles never receive a Supabase session/)
 })
+
+test('admin can list and approve pending Supabase accounts', async () => {
+  const [admin, data, auth, sql] = await Promise.all([
+    read('src/pages/AdminDashboard.tsx'),
+    read('src/context/DataContext.tsx'),
+    read('src/context/AuthContext.tsx'),
+    read('supabase/migrations/006_account_approval.sql'),
+  ])
+  assert.match(admin, /계정 승인/)
+  assert.match(admin, /승인 대기/)
+  assert.match(data, /\.rpc\('list_pending_accounts'/)
+  assert.match(data, /\.rpc\('approve_account'/)
+  assert.match(auth, /supabase\.auth\.signInWithPassword/)
+  assert.match(sql, /security definer/i)
+  assert.match(sql, /if not public\.is_admin\(\)/i)
+  assert.match(sql, /update auth\.users as target/i)
+  assert.match(sql, /email_confirmed_at/i)
+  assert.match(sql, /revoke all on function public\.approve_account\(uuid\)/i)
+  assert.match(sql, /encrypted_password = crypt\('demo1234'/i)
+})

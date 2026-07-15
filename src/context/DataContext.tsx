@@ -7,6 +7,7 @@ import type {
   Club,
   ClubApplication,
   DemoStore,
+  PendingAccount,
   Profile,
   RecruitmentSettings,
 } from '../types'
@@ -21,6 +22,8 @@ interface DataContextValue {
   questions: ApplicationQuestion[]
   applications: ClubApplication[]
   profiles: Profile[]
+  pendingAccounts: PendingAccount[]
+  accountApprovalReady: boolean
   favoriteClubIds: string[]
   notifications: AppNotification[]
   settings: RecruitmentSettings | null
@@ -36,6 +39,7 @@ interface DataContextValue {
   replaceQuestions: (clubId: string, questions: ApplicationQuestion[]) => Promise<void>
   updateSettings: (settings: RecruitmentSettings) => Promise<void>
   syncOfficialClubCatalog: () => Promise<void>
+  approveAccount: (userId: string) => Promise<void>
   promoteStudentToLeader: (profileId: string) => Promise<void>
   markNotificationRead: (notificationId: string) => Promise<void>
   uploadClubLogo: (clubId: string, file: File) => Promise<string>
@@ -135,6 +139,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [questions, setQuestions] = useState<ApplicationQuestion[]>([])
   const [applications, setApplications] = useState<ClubApplication[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
+  const [pendingAccounts, setPendingAccounts] = useState<PendingAccount[]>([])
+  const [accountApprovalReady, setAccountApprovalReady] = useState(false)
   const [favoriteClubIds, setFavoriteClubIds] = useState<string[]>([])
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [settings, setSettings] = useState<RecruitmentSettings | null>(null)
@@ -166,6 +172,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     if (isDemoMode) {
+      setPendingAccounts([])
+      setAccountApprovalReady(false)
       applyDemoStore(readDemoStore())
       return
     }
@@ -209,6 +217,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (!profile) {
         setApplications([])
         setProfiles([])
+        setPendingAccounts([])
+        setAccountApprovalReady(false)
         setFavoriteClubIds([])
         setNotifications([])
         return
@@ -235,6 +245,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
           createdAt: row.created_at,
         })),
       )
+
+      if (profile.role === 'admin') {
+        const { data: pendingRows, error: pendingError } = await supabase.rpc('list_pending_accounts')
+        if (pendingError?.code === 'PGRST202') {
+          setPendingAccounts([])
+          setAccountApprovalReady(false)
+        } else if (pendingError) {
+          throw pendingError
+        } else {
+          setPendingAccounts((pendingRows ?? []).map((row: any) => ({
+            id: row.user_id,
+            name: row.display_name,
+            studentNumber: row.student_number ?? undefined,
+            requestedAt: row.requested_at,
+          })))
+          setAccountApprovalReady(true)
+        }
+      } else {
+        setPendingAccounts([])
+        setAccountApprovalReady(false)
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '데이터를 불러오지 못했습니다.')
     } finally {
@@ -580,6 +611,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setProfiles((items) => items.map((item) => (item.id === profileId ? mapProfile(row) : item)))
   }
 
+  const approveAccount = async (userId: string) => {
+    if (isDemoMode) throw new Error('시연 관리자 계정은 실제 가입 계정을 승인할 수 없습니다. Supabase 관리자 계정으로 로그인해주세요.')
+    if (!supabase || profile?.role !== 'admin') throw new Error('관리자 계정으로 로그인해주세요.')
+    const { error } = await supabase.rpc('approve_account', { target_user_id: userId })
+    if (error?.code === 'PGRST202') throw new Error('계정 승인 DB 기능이 아직 설치되지 않았습니다.')
+    if (error) throw new Error(error.message || '계정을 승인하지 못했습니다.')
+    setPendingAccounts((items) => items.filter((item) => item.id !== userId))
+  }
+
   const markNotificationRead = async (notificationId: string) => {
     if (isDemoMode) {
       updateDemoStore((store) => ({
@@ -627,6 +667,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     questions,
     applications,
     profiles,
+    pendingAccounts,
+    accountApprovalReady,
     favoriteClubIds,
     notifications,
     settings,
@@ -642,6 +684,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     replaceQuestions,
     updateSettings,
     syncOfficialClubCatalog,
+    approveAccount,
     promoteStudentToLeader,
     markNotificationRead,
     uploadClubLogo,

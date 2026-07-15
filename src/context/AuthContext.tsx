@@ -104,7 +104,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isDemoMode) {
       const demoAccount = DEMO_ACCOUNTS.find((item) => item.email.toLowerCase() === email)
       if (demoAccount && password === DEMO_PASSWORD) {
-        if (supabase) await supabase.auth.signOut()
+        if (supabase) {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+          if (!error && data.user) {
+            await loadProfile(data.user.id)
+            return { requiresReload: false }
+          }
+          await supabase.auth.signOut()
+        }
         localStorage.setItem(DEMO_MODE_OVERRIDE_KEY, 'true')
         localStorage.setItem(DEMO_SESSION_KEY, demoAccount.id)
         return { requiresReload: true }

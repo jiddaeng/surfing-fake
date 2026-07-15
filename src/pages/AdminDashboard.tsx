@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BarChart3, Building2, CalendarClock, CheckCircle2, RefreshCcw, Save, ShieldCheck, Users } from 'lucide-react'
+import { BarChart3, Building2, CalendarClock, CheckCircle2, RefreshCcw, Save, ShieldCheck, UserCheck, Users } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import type { RecruitmentSettings } from '../types'
 import { ROLE_LABEL } from '../types'
 import { Badge, Button, inputClass } from '../components/ui'
 import { formatFullDate, toDateTimeLocal } from '../lib/utils'
+import { isDemoMode } from '../lib/supabase'
 
 export function AdminDashboard() {
-  const { clubs, applications, profiles, settings, updateSettings, syncOfficialClubCatalog, promoteStudentToLeader } = useData()
+  const { clubs, applications, profiles, pendingAccounts, accountApprovalReady, settings, updateSettings, syncOfficialClubCatalog, approveAccount, promoteStudentToLeader } = useData()
   const [schedule, setSchedule] = useState<RecruitmentSettings | null>(settings)
   const [saving, setSaving] = useState(false)
   const [promotingId, setPromotingId] = useState('')
   const [message, setMessage] = useState('')
   const [roleMessage, setRoleMessage] = useState('')
+  const [approvingId, setApprovingId] = useState('')
+  const [approvalMessage, setApprovalMessage] = useState('')
   const [catalogSyncing, setCatalogSyncing] = useState(false)
   const [catalogMessage, setCatalogMessage] = useState('')
   useEffect(() => setSchedule(settings), [settings])
@@ -52,6 +55,20 @@ export function AdminDashboard() {
     }
   }
 
+  const approve = async (userId: string) => {
+    const target = pendingAccounts.find((item) => item.id === userId)
+    if (!target) return
+    setApprovingId(userId); setApprovalMessage('')
+    try {
+      await approveAccount(userId)
+      setApprovalMessage(`${target.name} 계정을 승인했어요. 이제 학번으로 로그인할 수 있습니다.`)
+    } catch (error) {
+      setApprovalMessage(error instanceof Error ? error.message : '계정을 승인하지 못했습니다.')
+    } finally {
+      setApprovingId('')
+    }
+  }
+
   const syncCatalog = async () => {
     setCatalogSyncing(true); setCatalogMessage('')
     try {
@@ -79,6 +96,36 @@ export function AdminDashboard() {
 
         <section className="card p-5 sm:p-6"><div className="flex items-center gap-2"><CalendarClock size={19} className="text-brand-600" /><h2 className="font-black">공통 모집 일정</h2></div>{schedule && <div className="mt-5 space-y-4"><label className="block"><span className="mb-2 block text-xs font-bold text-gray-600">모집 시작</span><input type="datetime-local" value={toDateTimeLocal(schedule.recruitmentStartAt)} onChange={(e) => setSchedule({ ...schedule, recruitmentStartAt: new Date(e.target.value).toISOString() })} className={inputClass} /></label><label className="block"><span className="mb-2 block text-xs font-bold text-gray-600">모집 마감</span><input type="datetime-local" value={toDateTimeLocal(schedule.recruitmentEndAt)} onChange={(e) => setSchedule({ ...schedule, recruitmentEndAt: new Date(e.target.value).toISOString() })} className={inputClass} /></label><label className="block"><span className="mb-2 block text-xs font-bold text-gray-600">합격 발표</span><input type="datetime-local" value={toDateTimeLocal(schedule.resultAnnouncementAt)} onChange={(e) => setSchedule({ ...schedule, resultAnnouncementAt: new Date(e.target.value).toISOString() })} className={inputClass} /></label><label className="block"><span className="mb-2 block text-xs font-bold text-gray-600">학생별 최대 지원 수</span><input type="number" min={1} max={10} value={schedule.maxApplications} onChange={(e) => setSchedule({ ...schedule, maxApplications: Number(e.target.value) })} className={inputClass} /></label>{message && <p className={`rounded-xl px-3 py-2 text-xs font-medium ${message.includes('저장했') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{message}</p>}<Button onClick={saveSchedule} loading={saving} className="w-full"><Save size={16} /> 일정 저장</Button></div>}</section>
       </div>
+
+      <section className="mt-8">
+        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-black"><UserCheck size={20} className="text-brand-600" /> 계정 승인</h2>
+            <p className="mt-1 text-sm text-gray-500">회원가입을 요청한 학생을 확인하고 로그인을 허용합니다.</p>
+          </div>
+          <Badge tone={pendingAccounts.length ? 'red' : 'green'}>승인 대기 {pendingAccounts.length}명</Badge>
+        </div>
+        {approvalMessage && <p className={`mt-3 rounded-xl px-4 py-3 text-sm font-medium ${approvalMessage.includes('승인했') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{approvalMessage}</p>}
+        {isDemoMode ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800">현재 시연 관리자로 로그인되어 있어 실제 가입 계정은 표시되지 않습니다. 실제 Supabase 관리자 계정으로 로그인하면 승인 대기 목록이 나타납니다.</p>
+        ) : !accountApprovalReady ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium leading-6 text-amber-800">계정 승인용 데이터베이스 기능이 아직 설치되지 않았습니다. 최신 Supabase 마이그레이션을 한 번 적용해주세요.</p>
+        ) : (
+          <div className="card mt-3 overflow-hidden">
+            {pendingAccounts.length ? pendingAccounts.map((account) => (
+              <div key={account.id} className="flex flex-col gap-3 border-b border-gray-100 p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <strong className="block truncate text-sm text-gray-800">{account.name}</strong>
+                  <span className="mt-0.5 block truncate text-xs text-gray-500">학번 {account.studentNumber ?? '미설정'} · {formatFullDate(account.requestedAt)}</span>
+                </div>
+                <Button size="sm" onClick={() => approve(account.id)} loading={approvingId === account.id}>
+                  <UserCheck size={15} /> 계정 승인
+                </Button>
+              </div>
+            )) : <p className="px-5 py-12 text-center text-sm text-gray-500">승인을 기다리는 계정이 없어요.</p>}
+          </div>
+        )}
+      </section>
 
       <section className="mt-8">
         <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
