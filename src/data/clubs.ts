@@ -23,6 +23,11 @@ export const CLUB_CATALOG: readonly ClubCatalogEntry[] = [
   { name: '온', category: '수학', color: '#4f46e5' },
 ]
 
+export const LEGACY_DEMO_CLUB_NAMES = ['플레이스테이션', '아라', '인피니티', 'DIMI SOUND', 'MIRROR', '그린웨이브', 'STARTUP D', '제로백'] as const
+
+export const catalogClubId = (index: number) => `50000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`
+export const catalogQuestionId = (index: number) => `51000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`
+
 export const catalogSummary = (category: string) => `${category} 분야 동아리입니다.`
 
 export const catalogDescription = (name: string, category: string) => `# ${name}

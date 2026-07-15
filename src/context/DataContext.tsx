@@ -14,6 +14,7 @@ import { isDemoMode, supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { uid } from '../lib/utils'
 import { createDemoStore, readDemoAccounts, saveDemoAccount } from '../data/demo'
+import { CLUB_CATALOG, LEGACY_DEMO_CLUB_NAMES, catalogClubId, catalogDescription, catalogQuestionId, catalogSummary } from '../data/clubs'
 
 interface DataContextValue {
   clubs: Club[]
@@ -34,6 +35,7 @@ interface DataContextValue {
   createClub: (values: Pick<Club, 'name' | 'category' | 'summary' | 'description' | 'capacity' | 'color'>) => Promise<Club>
   replaceQuestions: (clubId: string, questions: ApplicationQuestion[]) => Promise<void>
   updateSettings: (settings: RecruitmentSettings) => Promise<void>
+  syncOfficialClubCatalog: () => Promise<void>
   promoteStudentToLeader: (profileId: string) => Promise<void>
   markNotificationRead: (notificationId: string) => Promise<void>
   uploadClubLogo: (clubId: string, file: File) => Promise<string>
@@ -68,6 +70,27 @@ const mapClub = (row: any): Club => ({
   isPublished: row.is_published,
   createdAt: row.created_at,
 })
+
+const officialClubsFromRows = (rows: any[]): Club[] => {
+  const byName = new Map(rows.map((row) => [row.name, row]))
+  return CLUB_CATALOG.map((entry, index) => {
+    const row = byName.get(entry.name)
+    if (row) return mapClub(row)
+    return {
+      id: catalogClubId(index),
+      name: entry.name,
+      category: entry.category,
+      summary: catalogSummary(entry.category),
+      description: catalogDescription(entry.name, entry.category),
+      color: entry.color,
+      capacity: 10,
+      leaderId: '',
+      leaderName: entry.leaderName ?? '담당 동아리장',
+      isPublished: true,
+      createdAt: new Date(0).toISOString(),
+    }
+  })
+}
 
 const mapQuestion = (row: any): ApplicationQuestion => ({
   id: row.id,
@@ -161,8 +184,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (clubsResult.error || questionsResult.error || settingsResult.error) {
         throw new Error('Supabase 테이블을 불러오지 못했습니다. 초기 SQL을 실행했는지 확인해주세요.')
       }
-      setClubs((clubsResult.data ?? []).map(mapClub))
-      setQuestions((questionsResult.data ?? []).map(mapQuestion))
+      const officialClubs = officialClubsFromRows(clubsResult.data ?? [])
+      setClubs(officialClubs)
+      const mappedQuestions = (questionsResult.data ?? []).map(mapQuestion)
+      setQuestions(officialClubs.flatMap((club, index) => {
+        const clubQuestions = mappedQuestions.filter((question) => question.clubId === club.id)
+        return clubQuestions.length ? clubQuestions : [{
+          id: catalogQuestionId(index),
+          clubId: club.id,
+          type: 'long' as const,
+          label: `${club.name}에 지원한 이유를 알려주세요.`,
+          required: true,
+          order: 0,
+        }]
+      }))
       setSettings({
         id: settingsResult.data.id,
         recruitmentStartAt: settingsResult.data.recruitment_start_at,
@@ -456,6 +491,65 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setSettings(next)
   }
 
+  const syncOfficialClubCatalog = async () => {
+    if (isDemoMode) {
+      const official = createDemoStore()
+      updateDemoStore((store) => ({ ...store, clubs: official.clubs, questions: official.questions }))
+      return
+    }
+    if (!supabase || profile?.role !== 'admin') throw new Error('관리자 계정으로 로그인해주세요.')
+
+    const { data: currentRows, error: currentError } = await supabase.from('clubs').select('*')
+    if (currentError) throw currentError
+    const currentByName = new Map((currentRows ?? []).map((row: any) => [row.name, row]))
+    const rows = CLUB_CATALOG.map((entry, index) => {
+      const current: any = currentByName.get(entry.name)
+      const summaryIsPlaceholder = !current?.summary || current.summary === '동아리 소개 준비 중입니다.'
+      const descriptionIsPlaceholder = !current?.description || current.description.includes('동아리 소개 준비 중')
+      return {
+        id: current?.id ?? catalogClubId(index),
+        name: entry.name,
+        category: entry.category,
+        summary: summaryIsPlaceholder ? catalogSummary(entry.category) : current.summary,
+        description: descriptionIsPlaceholder ? catalogDescription(entry.name, entry.category) : current.description,
+        color: current?.color ?? entry.color,
+        capacity: current?.capacity ?? 10,
+        leader_name: entry.leaderName ?? current?.leader_name ?? '담당 동아리장',
+        is_published: true,
+      }
+    })
+
+    const { error: hideError } = await supabase.from('clubs').update({ is_published: false }).in('name', [...LEGACY_DEMO_CLUB_NAMES])
+    if (hideError) throw hideError
+    const { data: officialRows, error: upsertError } = await supabase.from('clubs').upsert(rows, { onConflict: 'name' }).select('id, name')
+    if (upsertError) throw upsertError
+
+    const officialIds = (officialRows ?? []).map((row) => row.id)
+    const { data: existingQuestions, error: questionReadError } = await supabase
+      .from('application_questions')
+      .select('club_id')
+      .in('club_id', officialIds)
+    if (questionReadError) throw questionReadError
+    const clubsWithQuestions = new Set((existingQuestions ?? []).map((row) => row.club_id))
+    const missingQuestions = (officialRows ?? []).flatMap((row) => {
+      if (clubsWithQuestions.has(row.id)) return []
+      const index = CLUB_CATALOG.findIndex((entry) => entry.name === row.name)
+      return [{
+        id: catalogQuestionId(index),
+        club_id: row.id,
+        type: 'long',
+        label: `${row.name}에 지원한 이유를 알려주세요.`,
+        required: true,
+        display_order: 0,
+      }]
+    })
+    if (missingQuestions.length) {
+      const { error } = await supabase.from('application_questions').insert(missingQuestions)
+      if (error) throw error
+    }
+    await reload()
+  }
+
   const promoteStudentToLeader = async (profileId: string) => {
     if (isDemoMode) {
       updateDemoStore((store) => ({
@@ -539,6 +633,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createClub,
     replaceQuestions,
     updateSettings,
+    syncOfficialClubCatalog,
     promoteStudentToLeader,
     markNotificationRead,
     uploadClubLogo,

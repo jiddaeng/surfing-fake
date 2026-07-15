@@ -65,7 +65,7 @@
 
 실제 이메일이 아닌 시연 주소이므로 초대 메일 발송 방식이 아니라 Dashboard에서 이메일과 비밀번호를 직접 지정하는 사용자 생성 방식을 사용해야 합니다.
 
-실서비스에서는 `Authentication → Providers → Email`의 이메일 확인을 켜고, CAPTCHA와 Auth rate limit을 설정하세요. URL Configuration의 Site URL/Redirect URL에는 실제 배포 주소만 등록해야 합니다. 앱과 DB는 `@dimigo.hs.kr` 학교 이메일과 중복되지 않는 학번만 허용합니다.
+앱 화면에서는 이메일을 받지 않고 학번 또는 로그인 ID만 입력합니다. Supabase Auth에는 내부 식별을 위해 `<로그인 ID>@dimigo.hs.kr` 형식으로 저장됩니다. 이메일 확인을 켠 경우 사용자가 메일을 받을 수 없으므로 Dashboard에서 계정을 승인해야 합니다. CAPTCHA와 Auth rate limit을 설정하고 URL Configuration의 Site URL/Redirect URL에는 실제 배포 주소만 등록하세요.
 
 ## 3. 예시 동아리와 역할 넣기
 
@@ -180,7 +180,7 @@ Vite는 실행할 때 `.env.local`을 읽습니다. `.env.local`을 수정했다
 
 ### `Invalid login credentials`
 
-Authentication의 Users에 계정이 만들어졌는지, 이메일이 정확한지, Auto confirm이 적용됐는지 확인합니다.
+Authentication의 Users에 `<로그인 ID>@dimigo.hs.kr` 계정이 만들어졌는지, Auto confirm 또는 관리자 승인이 적용됐는지 확인합니다.
 
 ### `new row violates row-level security policy`
 

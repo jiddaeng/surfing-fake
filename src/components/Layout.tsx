@@ -161,7 +161,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 <div className="absolute right-0 top-12 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
                   <div className="border-b border-gray-100 px-3 py-2.5">
                     <p className="text-sm font-bold">{profile.name}</p>
-                    <p className="mt-0.5 truncate text-xs text-gray-500">{profile.email}</p>
+                    <p className="mt-0.5 truncate text-xs text-gray-500">ID: {profile.studentNumber ?? profile.email.split('@')[0]}</p>
                   </div>
                   <button onClick={handleSignOut} className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100">
                     <LogOut size={16} /> 로그아웃
@@ -178,7 +178,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <div className="border-t border-gray-100 bg-white px-4 py-3 lg:hidden">
             <div className="mb-3 flex items-center gap-3 rounded-xl bg-gray-50 p-3 sm:hidden">
               <CircleUserRound className="text-brand-600" />
-              <div className="min-w-0 flex-1"><p className="text-sm font-bold">{profile.name}</p><p className="truncate text-xs text-gray-500">{profile.email}</p></div>
+              <div className="min-w-0 flex-1"><p className="text-sm font-bold">{profile.name}</p><p className="truncate text-xs text-gray-500">ID: {profile.studentNumber ?? profile.email.split('@')[0]}</p></div>
               <Badge tone="blue">{ROLE_LABEL[profile.role]}</Badge>
             </div>
             {navigation.map((item) => (

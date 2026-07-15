@@ -7,14 +7,18 @@ interface AuthContextValue {
   profile: Profile | null
   loading: boolean
   configured: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (name: string, studentNumber: string, email: string, password: string) => Promise<{ requiresEmailConfirmation: boolean }>
+  signIn: (loginId: string, password: string) => Promise<void>
+  signUp: (name: string, studentNumber: string, password: string) => Promise<{ requiresApproval: boolean }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 const demoSessionKey = 'surfing-fake:demo-session'
+const toInternalEmail = (loginId: string) => {
+  const normalized = loginId.trim().toLowerCase()
+  return normalized.includes('@') ? normalized : `${normalized}@dimigo.hs.kr`
+}
 
 const mapProfile = (row: any): Profile => ({
   id: row.id,
@@ -90,10 +94,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (loginId: string, password: string) => {
+    const email = toInternalEmail(loginId)
     if (isDemoMode) {
-      const account = readDemoAccounts().find((item) => item.email.toLowerCase() === email.trim().toLowerCase() && item.password === password)
-      if (!account) throw new Error('이메일 또는 비밀번호를 확인해주세요.')
+      const account = readDemoAccounts().find((item) => item.email.toLowerCase() === email && item.password === password)
+      if (!account) throw new Error('로그인 ID 또는 비밀번호를 확인해주세요.')
       localStorage.setItem(demoSessionKey, account.id)
       const { password: _password, ...nextProfile } = account
       void _password
@@ -101,18 +106,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     if (!supabase) throw new Error('Supabase 환경변수가 설정되지 않았습니다.')
-    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
-    if (error) throw new Error('이메일 또는 비밀번호를 확인해주세요.')
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      if (error.message.toLowerCase().includes('email not confirmed')) throw new Error('아직 승인되지 않은 계정입니다. 관리자에게 문의해주세요.')
+      throw new Error('로그인 ID 또는 비밀번호를 확인해주세요.')
+    }
     await loadProfile(data.user.id)
   }
 
-  const signUp = async (name: string, studentNumber: string, email: string, password: string) => {
+  const signUp = async (name: string, studentNumber: string, password: string) => {
+    const email = toInternalEmail(studentNumber)
     if (isDemoMode) {
-      const normalizedEmail = email.trim().toLowerCase()
-      if (readDemoAccounts().some((item) => item.email.toLowerCase() === normalizedEmail)) throw new Error('이미 가입된 이메일입니다.')
+      if (readDemoAccounts().some((item) => item.email.toLowerCase() === email)) throw new Error('이미 가입된 학번입니다.')
       const account = {
         id: crypto.randomUUID(),
-        email: normalizedEmail,
+        email,
         password,
         name: name.trim(),
         studentNumber: studentNumber.trim(),
@@ -124,11 +132,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { password: _password, ...nextProfile } = account
       void _password
       setProfile(nextProfile)
-      return { requiresEmailConfirmation: false }
+      return { requiresApproval: false }
     }
     if (!supabase) throw new Error('Supabase 환경변수가 설정되지 않았습니다.')
     const { data, error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
+      email,
       password,
       options: {
         data: {
@@ -138,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     })
     if (error) {
-      if (error.message.toLowerCase().includes('already registered')) throw new Error('가입 요청을 처리할 수 없습니다. 이메일을 확인하거나 로그인해 주세요.')
+      if (error.message.toLowerCase().includes('already registered')) throw new Error('이미 가입된 학번입니다.')
       if (error.message.toLowerCase().includes('password')) throw new Error('비밀번호가 보안 기준을 충족하지 않습니다.')
       throw new Error(error.message || '회원가입하지 못했습니다.')
     }
@@ -146,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await new Promise((resolve) => window.setTimeout(resolve, 150))
       await loadProfile(data.user.id)
     }
-    return { requiresEmailConfirmation: !data.session }
+    return { requiresApproval: !data.session }
   }
 
   const signOut = async () => {
