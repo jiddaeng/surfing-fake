@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { ClubCard } from '../components/ClubCard'
 import { Button, EmptyState, inputClass } from '../components/ui'
+import { CLUB_CATEGORIES } from '../data/clubs'
 
 export function ClubsPage() {
   const { profile } = useAuth()
@@ -13,7 +14,7 @@ export function ClubsPage() {
   const [sort, setSort] = useState('name')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
 
-  const categories = ['전체', ...Array.from(new Set(clubs.map((club) => club.category)))]
+  const categories = ['전체', ...CLUB_CATEGORIES]
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase()
     return clubs

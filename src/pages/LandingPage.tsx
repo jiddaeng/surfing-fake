@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { Button } from '../components/ui'
 import { ClubLogo } from '../components/ClubLogo'
+import { CLUB_CATALOG, catalogSummary } from '../data/clubs'
 
 export function LandingPage() {
   const { profile } = useAuth()
@@ -42,11 +43,11 @@ export function LandingPage() {
               <div className="flex items-center gap-3 rounded-2xl bg-gray-50 px-4 py-3 text-gray-400"><Search size={18} /><span className="text-sm">관심 있는 동아리를 검색해보세요</span></div>
               <div className="mt-5 flex items-center justify-between"><strong className="text-sm">지금 주목받는 동아리</strong><span className="text-xs font-bold text-brand-600">전체보기</span></div>
               <div className="mt-3 space-y-2.5">
-                {(clubs.length ? clubs.slice(0, 3) : [
-                  { id: '1', name: '저스트', summary: '동아리 소개 준비 중', category: '전공', color: '#155eef' },
-                  { id: '2', name: '루나', summary: '동아리 소개 준비 중', category: '전공', color: '#7c3aed' },
-                  { id: '3', name: '임플루드', summary: '동아리 소개 준비 중', category: '전공', color: '#0e9384' },
-                ] as any[]).map((club) => (
+                {(clubs.length ? clubs.slice(0, 3) : CLUB_CATALOG.slice(0, 3).map((club, index) => ({
+                  ...club,
+                  id: String(index + 1),
+                  summary: catalogSummary(club.category),
+                })) as any[]).map((club) => (
                   <div key={club.id} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
                     <ClubLogo club={{ ...club, logoUrl: undefined } as any} size="sm" />
                     <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{club.name}</p><p className="mt-0.5 text-xs text-gray-400">{club.summary}</p></div>
@@ -56,7 +57,7 @@ export function LandingPage() {
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-brand-600 p-4 text-white"><p className="text-xs text-brand-100">모집 마감까지</p><p className="mt-1 text-2xl font-black">D-7</p></div>
-                <div className="rounded-2xl bg-gray-900 p-4 text-white"><p className="text-xs text-gray-400">등록 동아리</p><p className="mt-1 text-2xl font-black">{clubs.length || 9}<span className="ml-1 text-sm">개</span></p></div>
+                <div className="rounded-2xl bg-gray-900 p-4 text-white"><p className="text-xs text-gray-400">등록 동아리</p><p className="mt-1 text-2xl font-black">{clubs.length || CLUB_CATALOG.length}<span className="ml-1 text-sm">개</span></p></div>
               </div>
             </div>
           </div>

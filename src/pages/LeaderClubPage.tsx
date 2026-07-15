@@ -7,15 +7,14 @@ import { QUESTION_TYPE_LABEL } from '../types'
 import { Button, Field, inputClass } from '../components/ui'
 import { uid } from '../lib/utils'
 import { SafeMarkdown } from '../components/SafeMarkdown'
-
-const categories = ['전공', '창업', '학술', '문화예술', '체육', '봉사', '기타']
+import { CLUB_CATEGORIES } from '../data/clubs'
 
 export function LeaderClubPage() {
   const { profile } = useAuth()
   const { clubs, questions, createClub, updateClub, replaceQuestions, uploadClubLogo } = useData()
   const club = clubs.find((item) => item.leaderId === profile?.id)
   const originalQuestions = useMemo(() => questions.filter((item) => item.clubId === club?.id).sort((a, b) => a.order - b.order), [questions, club?.id])
-  const [form, setForm] = useState({ name: '', category: '전공', summary: '', description: '# 동아리를 소개해주세요\n\n동아리의 활동과 모집 정보를 자유롭게 작성하세요.', capacity: 10, color: '#155eef' })
+  const [form, setForm] = useState({ name: '', category: String(CLUB_CATEGORIES[0]), summary: '', description: '# 동아리를 소개해주세요\n\n동아리의 활동과 모집 정보를 자유롭게 작성하세요.', capacity: 10, color: '#155eef' })
   const [draftQuestions, setDraftQuestions] = useState<ApplicationQuestion[]>([])
   const [tab, setTab] = useState<'edit' | 'preview'>('edit')
   const [saving, setSaving] = useState(false)
@@ -62,7 +61,7 @@ export function LeaderClubPage() {
         <h2 className="text-lg font-black">기본 정보</h2>
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <Field label="동아리 이름" required><input maxLength={100} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} placeholder="동아리 이름" /></Field>
-          <Field label="카테고리" required><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass}>{categories.map((item) => <option key={item}>{item}</option>)}</select></Field>
+          <Field label="카테고리" required><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass}>{CLUB_CATEGORIES.map((item) => <option key={item}>{item}</option>)}</select></Field>
           <div className="sm:col-span-2"><Field label="한 줄 소개" required hint={`${form.summary.length}/80자`}><input maxLength={80} value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} className={inputClass} placeholder="학생들이 한눈에 이해할 수 있는 소개" /></Field></div>
           <Field label="모집 인원" required><div className="relative"><input type="number" min={1} max={1000} value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} className={`${inputClass} pr-10`} /><span className="absolute right-3.5 top-3 text-sm text-gray-400">명</span></div></Field>
           <Field label="대표 색상"><div className="flex gap-2"><input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="h-11 w-14 rounded-xl border border-gray-200 bg-white p-1" /><input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className={inputClass} /></div></Field>

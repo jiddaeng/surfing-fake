@@ -40,7 +40,7 @@ interface DataContextValue {
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
-const demoStoreKey = 'surfing-fake:demo-store:v1'
+const demoStoreKey = 'surfing-fake:demo-store:v2'
 
 const readDemoStore = (): DemoStore => {
   try {
@@ -64,7 +64,7 @@ const mapClub = (row: any): Club => ({
   color: row.color,
   capacity: row.capacity,
   leaderId: row.leader_id ?? '',
-  leaderName: row.leader?.name ?? row.leader_name ?? '동아리장',
+  leaderName: row.leader_name ?? row.leader?.name ?? '동아리장',
   isPublished: row.is_published,
   createdAt: row.created_at,
 })

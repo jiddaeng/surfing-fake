@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Heart, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import { ClubCard } from '../components/ClubCard'
+import { CLUB_CATEGORIES } from '../data/clubs'
 import { Button, EmptyState, inputClass } from '../components/ui'
 
 export function StudentDashboard() {
@@ -12,7 +13,7 @@ export function StudentDashboard() {
   const [sort, setSort] = useState('name')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
 
-  const categories = ['전체', ...Array.from(new Set(clubs.map((club) => club.category)))]
+  const categories = ['전체', ...CLUB_CATEGORIES]
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase()
     return clubs

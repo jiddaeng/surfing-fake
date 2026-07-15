@@ -1,4 +1,5 @@
 import type { Club, DemoStore, Profile } from '../types'
+import { CLUB_CATALOG, catalogDescription, catalogSummary } from './clubs'
 
 export const DEMO_PASSWORD = 'local-demo-only'
 
@@ -68,23 +69,18 @@ const day = (offset: number, hour = 18) => {
   return date.toISOString()
 }
 
-const clubNames = ['저스트', '루나', '임플루드', '모나드', '게임즈', '블루프린트', '무럭무럭', '커맨드', '토포스']
-const colors = ['#155eef', '#7c3aed', '#0e9384', '#dc6803', '#d92d20', '#2563eb', '#039855', '#475467', '#c11574']
+const demoId = (prefix: '2' | '3', index: number) => `${prefix}0000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`
 
-const clubs: Club[] = clubNames.map((name, index) => ({
-  id: `20000000-0000-0000-0000-00000000000${index + 1}`,
-  name,
-  category: '전공',
-  summary: '동아리 소개 준비 중입니다.',
-  description: `# ${name}
-
-동아리 소개 준비 중입니다.
-
-동아리장이 활동 내용, 모집 분야, 지원 안내를 Markdown으로 자유롭게 작성할 수 있습니다.`,
-  color: colors[index],
+const clubs: Club[] = CLUB_CATALOG.map((entry, index) => ({
+  id: demoId('2', index),
+  name: entry.name,
+  category: entry.category,
+  summary: catalogSummary(entry.category),
+  description: catalogDescription(entry.name, entry.category),
+  color: entry.color,
   capacity: 10,
-  leaderId: index === 0 ? '10000000-0000-0000-0000-000000000002' : `10000000-0000-0000-0000-0000000000${index + 10}`,
-  leaderName: index === 0 ? '시연 동아리장' : '담당 동아리장',
+  leaderId: index === 0 ? '10000000-0000-0000-0000-000000000002' : '',
+  leaderName: entry.leaderName ?? '담당 동아리장',
   isPublished: true,
   createdAt: day(-30 + index),
 }))
@@ -120,11 +116,11 @@ export const createDemoStore = (): DemoStore => ({
     maxApplications: 3,
   },
   clubs,
-  questions: clubNames.map((name, index) => ({
-    id: `30000000-0000-0000-0000-00000000000${index + 1}`,
-    clubId: `20000000-0000-0000-0000-00000000000${index + 1}`,
+  questions: CLUB_CATALOG.map((entry, index) => ({
+    id: demoId('3', index),
+    clubId: demoId('2', index),
     type: 'long',
-    label: `${name}에 지원한 이유를 알려주세요.`,
+    label: `${entry.name}에 지원한 이유를 알려주세요.`,
     required: true,
     order: 1,
   })),
