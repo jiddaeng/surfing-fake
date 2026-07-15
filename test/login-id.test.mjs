@@ -30,7 +30,7 @@ test('admin can synchronize the official catalog without a database migration', 
   assert.match(data, /\.upsert\(rows, \{ onConflict: 'name' \}\)/)
 })
 
-test('deployed login offers isolated demo accounts with the requested password', async () => {
+test('configured login uses real Supabase sessions for demo credentials', async () => {
   const [login, auth, demo, supabaseClient] = await Promise.all([
     read('src/pages/LoginPage.tsx'),
     read('src/context/AuthContext.tsx'),
@@ -42,8 +42,10 @@ test('deployed login offers isolated demo accounts with the requested password',
   assert.doesNotMatch(login, /isDemoMode &&/)
   assert.match(login, /setPassword\(DEMO_PASSWORD\)/)
   assert.match(auth, /DEMO_MODE_OVERRIDE_KEY/)
-  assert.match(auth, /return \{ requiresReload: true \}/)
-  assert.match(supabaseClient, /Demo roles never receive a Supabase session/)
+  assert.doesNotMatch(auth, /localStorage\.setItem\(DEMO_MODE_OVERRIDE_KEY/)
+  assert.doesNotMatch(auth, /password === DEMO_PASSWORD/)
+  assert.match(auth, /supabase\.auth\.signInWithPassword\(\{ email, password \}\)/)
+  assert.match(supabaseClient, /!isSupabaseConfigured && legacyDemoSessionEnabled/)
 })
 
 test('admin can list and approve pending Supabase accounts', async () => {

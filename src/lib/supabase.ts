@@ -5,11 +5,6 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim()
 
 const demoHost = typeof window !== 'undefined' && ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
-const demoSessionEnabled = typeof window !== 'undefined' && window.localStorage.getItem(DEMO_MODE_OVERRIDE_KEY) === 'true'
-
-// A selected demo account reloads the app into an isolated local-only data mode.
-// Demo roles never receive a Supabase session and therefore cannot access protected data.
-export const isDemoMode = (import.meta.env.VITE_DEMO_MODE === 'true' && demoHost) || demoSessionEnabled
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
@@ -17,6 +12,15 @@ export const isSupabaseConfigured = Boolean(
     !supabaseUrl.includes('YOUR_PROJECT_ID') &&
     !supabaseKey.includes('YOUR_PUBLISHABLE'),
 )
+
+const localDemoModeRequested = import.meta.env.VITE_DEMO_MODE === 'true' && demoHost
+const legacyDemoSessionEnabled =
+  typeof window !== 'undefined' && window.localStorage.getItem(DEMO_MODE_OVERRIDE_KEY) === 'true'
+
+// A configured app must use real Supabase sessions, including the four demo
+// credentials. The legacy override is kept only for unconfigured local copies
+// so an old browser flag cannot silently downgrade an administrator session.
+export const isDemoMode = localDemoModeRequested || (!isSupabaseConfigured && legacyDemoSessionEnabled)
 
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseKey, {

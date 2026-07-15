@@ -75,26 +75,7 @@ const mapClub = (row: any): Club => ({
   createdAt: row.created_at,
 })
 
-const officialClubsFromRows = (rows: any[]): Club[] => {
-  const byName = new Map(rows.map((row) => [row.name, row]))
-  return CLUB_CATALOG.map((entry, index) => {
-    const row = byName.get(entry.name)
-    if (row) return mapClub(row)
-    return {
-      id: catalogClubId(index),
-      name: entry.name,
-      category: entry.category,
-      summary: catalogSummary(entry.category),
-      description: catalogDescription(entry.name, entry.category),
-      color: entry.color,
-      capacity: 10,
-      leaderId: '',
-      leaderName: entry.leaderName ?? '담당 동아리장',
-      isPublished: true,
-      createdAt: new Date(0).toISOString(),
-    }
-  })
-}
+const persistedClubsFromRows = (rows: any[]): Club[] => rows.map(mapClub)
 
 const mapQuestion = (row: any): ApplicationQuestion => ({
   id: row.id,
@@ -192,20 +173,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (clubsResult.error || questionsResult.error || settingsResult.error) {
         throw new Error('Supabase 테이블을 불러오지 못했습니다. 초기 SQL을 실행했는지 확인해주세요.')
       }
-      const officialClubs = officialClubsFromRows(clubsResult.data ?? [])
-      setClubs(officialClubs)
+      const persistedClubs = persistedClubsFromRows(clubsResult.data ?? [])
+      setClubs(persistedClubs)
       const mappedQuestions = (questionsResult.data ?? []).map(mapQuestion)
-      setQuestions(officialClubs.flatMap((club, index) => {
-        const clubQuestions = mappedQuestions.filter((question) => question.clubId === club.id)
-        return clubQuestions.length ? clubQuestions : [{
-          id: catalogQuestionId(index),
-          clubId: club.id,
-          type: 'long' as const,
-          label: `${club.name}에 지원한 이유를 알려주세요.`,
-          required: true,
-          order: 0,
-        }]
-      }))
+      setQuestions(mappedQuestions)
       setSettings({
         id: settingsResult.data.id,
         recruitmentStartAt: settingsResult.data.recruitment_start_at,
@@ -454,6 +425,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return club
     }
     if (!supabase || !profile) throw new Error('로그인이 필요합니다.')
+    const clubSelection = '*, leader:profiles!clubs_leader_id_fkey(name)'
+    const { data: existingClub, error: existingError } = await supabase
+      .from('clubs')
+      .select(clubSelection)
+      .eq('leader_id', profile.id)
+      .maybeSingle()
+    if (existingError) throw new Error(existingError.message || '기존 동아리 정보를 확인하지 못했습니다.')
+    if (existingClub) {
+      const { data: updatedClub, error: updateError } = await supabase
+        .from('clubs')
+        .update({
+          name: values.name,
+          category: values.category,
+          summary: values.summary,
+          description: values.description,
+          capacity: values.capacity,
+          color: values.color,
+        })
+        .eq('id', existingClub.id)
+        .select(clubSelection)
+        .single()
+      if (updateError) throw new Error(updateError.message || '기존 동아리 정보를 저장하지 못했습니다.')
+      const club = mapClub(updatedClub)
+      setClubs((items) => items.some((item) => item.id === club.id)
+        ? items.map((item) => item.id === club.id ? club : item)
+        : [...items, club])
+      return club
+    }
     const { data, error } = await supabase
       .from('clubs')
       .insert({
@@ -466,9 +465,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         leader_id: profile.id,
         leader_name: profile.name,
       })
-      .select('*, leader:profiles!clubs_leader_id_fkey(name)')
+      .select(clubSelection)
       .single()
-    if (error) throw error
+    if (error?.code === '23505') {
+      if (error.message.includes('clubs_name_key') || error.details?.includes('(name)')) {
+        throw new Error('이미 사용 중인 동아리 이름입니다. 다른 이름을 입력해주세요.')
+      }
+      throw new Error('이 계정에는 이미 등록된 동아리가 있습니다. 페이지를 새로고침해주세요.')
+    }
+    if (error) throw new Error(error.message || '동아리를 저장하지 못했습니다.')
     const club = mapClub(data)
     setClubs((items) => [...items, club])
     return club
