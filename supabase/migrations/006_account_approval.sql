@@ -88,4 +88,6 @@ update public.profiles
 set role = 'leader', is_active = true
 where lower(email) in ('leader@dimigo.hs.kr', 'newleader@dimigo.hs.kr');
 
+notify pgrst, 'reload schema';
+
 commit;
