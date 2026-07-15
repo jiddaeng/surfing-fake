@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Profile } from '../types'
 import { isDemoMode, isSupabaseConfigured, supabase } from '../lib/supabase'
-import { DEMO_ACCOUNTS } from '../data/demo'
+import { readDemoAccounts, saveDemoAccount } from '../data/demo'
 
 interface AuthContextValue {
   profile: Profile | null
@@ -15,16 +15,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 const demoSessionKey = 'surfing-fake:demo-session'
-const demoAccountsKey = 'surfing-fake:demo-accounts'
-
-const demoAccounts = () => {
-  try {
-    const custom = JSON.parse(localStorage.getItem(demoAccountsKey) || '[]')
-    return [...DEMO_ACCOUNTS, ...(Array.isArray(custom) ? custom : [])]
-  } catch {
-    return DEMO_ACCOUNTS
-  }
-}
 
 const mapProfile = (row: any): Profile => ({
   id: row.id,
@@ -43,8 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = async (userId?: string) => {
     if (isDemoMode) {
       const id = userId || localStorage.getItem(demoSessionKey)
-      const account = demoAccounts().find((item) => item.id === id)
-      setProfile(account ? { ...account, password: undefined } : null)
+      const account = readDemoAccounts().find((item) => item.id === id)
+      if (!account) {
+        setProfile(null)
+        return
+      }
+      const { password: _password, ...nextProfile } = account
+      void _password
+      setProfile(nextProfile)
       return
     }
     if (!supabase) {
@@ -96,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     if (isDemoMode) {
-      const account = demoAccounts().find((item) => item.email.toLowerCase() === email.trim().toLowerCase() && item.password === password)
+      const account = readDemoAccounts().find((item) => item.email.toLowerCase() === email.trim().toLowerCase() && item.password === password)
       if (!account) throw new Error('이메일 또는 비밀번호를 확인해주세요.')
       localStorage.setItem(demoSessionKey, account.id)
       const { password: _password, ...nextProfile } = account
@@ -105,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     if (!supabase) throw new Error('Supabase 환경변수가 설정되지 않았습니다.')
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
     if (error) throw new Error('이메일 또는 비밀번호를 확인해주세요.')
     await loadProfile(data.user.id)
   }
@@ -113,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (name: string, studentNumber: string, email: string, password: string) => {
     if (isDemoMode) {
       const normalizedEmail = email.trim().toLowerCase()
-      if (demoAccounts().some((item) => item.email.toLowerCase() === normalizedEmail)) throw new Error('이미 가입된 이메일입니다.')
+      if (readDemoAccounts().some((item) => item.email.toLowerCase() === normalizedEmail)) throw new Error('이미 가입된 이메일입니다.')
       const account = {
         id: crypto.randomUUID(),
         email: normalizedEmail,
@@ -123,8 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: 'student' as const,
         isActive: true,
       }
-      const custom = demoAccounts().filter((item) => !DEMO_ACCOUNTS.some((base) => base.id === item.id))
-      localStorage.setItem(demoAccountsKey, JSON.stringify([...custom, account]))
+      saveDemoAccount(account)
       localStorage.setItem(demoSessionKey, account.id)
       const { password: _password, ...nextProfile } = account
       void _password
@@ -133,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (!supabase) throw new Error('Supabase 환경변수가 설정되지 않았습니다.')
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: email.trim().toLowerCase(),
       password,
       options: {
         data: {
@@ -143,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     })
     if (error) {
-      if (error.message.toLowerCase().includes('already registered')) throw new Error('이미 가입된 이메일입니다.')
+      if (error.message.toLowerCase().includes('already registered')) throw new Error('가입 요청을 처리할 수 없습니다. 이메일을 확인하거나 로그인해 주세요.')
       if (error.message.toLowerCase().includes('password')) throw new Error('비밀번호가 보안 기준을 충족하지 않습니다.')
       throw new Error(error.message || '회원가입하지 못했습니다.')
     }
@@ -173,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) throw new Error('useAuth는 AuthProvider 안에서 사용해야 합니다.')

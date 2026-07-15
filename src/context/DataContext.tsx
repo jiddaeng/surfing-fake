@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import type {
   AnswerValue,
   AppNotification,
@@ -13,7 +13,7 @@ import type {
 import { isDemoMode, supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { uid } from '../lib/utils'
-import { createDemoStore } from '../data/demo'
+import { createDemoStore, readDemoAccounts, saveDemoAccount } from '../data/demo'
 
 interface DataContextValue {
   clubs: Club[]
@@ -118,7 +118,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const applyDemoStore = (store: DemoStore) => {
+  const applyDemoStore = useCallback((store: DemoStore) => {
     const withCurrentProfile = profile && !store.profiles.some((item) => item.id === profile.id)
       ? { ...store, profiles: [...store.profiles, profile] }
       : store
@@ -132,7 +132,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setSettings(withCurrentProfile.settings)
     setError(null)
     setLoading(false)
-  }
+  }, [profile])
 
   const updateDemoStore = (update: (store: DemoStore) => DemoStore) => {
     const next = update(readDemoStore())
@@ -141,7 +141,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return next
   }
 
-  const reload = async () => {
+  const reload = useCallback(async () => {
     if (isDemoMode) {
       applyDemoStore(readDemoStore())
       return
@@ -205,11 +205,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [applyDemoStore, profile])
 
   useEffect(() => {
-    reload()
-  }, [profile?.id])
+    void reload()
+  }, [reload])
 
   const toggleFavorite = async (clubId: string) => {
     if (isDemoMode) {
@@ -235,6 +235,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const persistAnswers = async (applicationId: string, answers: Record<string, AnswerValue>) => {
     if (!supabase) return
+    const emptyQuestionIds = Object.entries(answers)
+      .filter(([, answer]) => (Array.isArray(answer) ? answer.length === 0 : answer.trim().length === 0))
+      .map(([questionId]) => questionId)
+    if (emptyQuestionIds.length) {
+      const { error } = await supabase
+        .from('application_answers')
+        .delete()
+        .eq('application_id', applicationId)
+        .in('question_id', emptyQuestionIds)
+      if (error) throw error
+    }
     const rows = Object.entries(answers)
       .filter(([, answer]) => (Array.isArray(answer) ? answer.length > 0 : answer.trim().length > 0))
       .map(([questionId, answer]) => ({ application_id: applicationId, question_id: questionId, answer }))
@@ -451,18 +462,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ...store,
         profiles: store.profiles.map((item) => item.id === profileId ? { ...item, role: 'leader' } : item),
       }))
+      const account = readDemoAccounts().find((item) => item.id === profileId)
+      if (account) saveDemoAccount({ ...account, role: 'leader' })
       return
     }
-    if (!supabase) return
+    if (!supabase) throw new Error('Supabase 연결이 필요합니다.')
     const { data, error } = await supabase
-      .from('profiles')
-      .update({ role: 'leader' })
-      .eq('id', profileId)
-      .eq('role', 'student')
-      .select()
-      .single()
-    if (error) throw error
-    setProfiles((items) => items.map((item) => (item.id === profileId ? mapProfile(data) : item)))
+      .rpc('promote_student_to_leader', { target_profile_id: profileId })
+    if (error) {
+      if (error.code === 'PGRST202') throw new Error('Supabase에 동아리장 승격 migration(004)을 먼저 적용해주세요.')
+      throw new Error(error.message || '계정 역할을 변경하지 못했습니다.')
+    }
+    const row = Array.isArray(data) ? data[0] : data
+    if (!row || row.role !== 'leader') throw new Error('승격 결과를 확인하지 못했습니다. 다시 시도해주세요.')
+    setProfiles((items) => items.map((item) => (item.id === profileId ? mapProfile(row) : item)))
   }
 
   const markNotificationRead = async (notificationId: string) => {
@@ -480,6 +493,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }
 
   const uploadClubLogo = async (clubId: string, file: File) => {
+    const extensions: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+    }
+    const extension = extensions[file.type]
+    if (!extension) throw new Error('PNG, JPG, WEBP 이미지만 업로드할 수 있습니다.')
+    if (file.size <= 0 || file.size > 2 * 1024 * 1024) throw new Error('로고 이미지는 2MB 이하여야 합니다.')
     if (isDemoMode) {
       return await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -489,43 +510,44 @@ export function DataProvider({ children }: { children: ReactNode }) {
       })
     }
     if (!supabase) throw new Error('Supabase 연결이 필요합니다.')
-    const extension = file.name.split('.').pop()?.toLowerCase() || 'png'
-    const path = `${clubId}/logo-${Date.now()}.${extension}`
-    const { error } = await supabase.storage.from('club-logos').upload(path, file, { upsert: true })
+    const path = `${clubId}/logo-${crypto.randomUUID()}.${extension}`
+    const { error } = await supabase.storage.from('club-logos').upload(path, file, {
+      cacheControl: '3600',
+      contentType: file.type,
+      upsert: false,
+    })
     if (error) throw error
     return supabase.storage.from('club-logos').getPublicUrl(path).data.publicUrl
   }
 
-  const value = useMemo(
-    () => ({
-      clubs,
-      questions,
-      applications,
-      profiles,
-      favoriteClubIds,
-      notifications,
-      settings,
-      loading,
-      error,
-      reload,
-      toggleFavorite,
-      saveDraft,
-      submitApplication,
-      setApplicationStatus,
-      updateClub,
-      createClub,
-      replaceQuestions,
-      updateSettings,
-      promoteStudentToLeader,
-      markNotificationRead,
-      uploadClubLogo,
-    }),
-    [clubs, questions, applications, profiles, favoriteClubIds, notifications, settings, loading, error],
-  )
+  const value: DataContextValue = {
+    clubs,
+    questions,
+    applications,
+    profiles,
+    favoriteClubIds,
+    notifications,
+    settings,
+    loading,
+    error,
+    reload,
+    toggleFavorite,
+    saveDraft,
+    submitApplication,
+    setApplicationStatus,
+    updateClub,
+    createClub,
+    replaceQuestions,
+    updateSettings,
+    promoteStudentToLeader,
+    markNotificationRead,
+    uploadClubLogo,
+  }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useData = () => {
   const context = useContext(DataContext)
   if (!context) throw new Error('useData는 DataProvider 안에서 사용해야 합니다.')

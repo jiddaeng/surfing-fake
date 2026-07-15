@@ -41,6 +41,8 @@ npm run build
 
 Supabase를 처음 설정한다면 [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)를 순서대로 따라가세요.
 
+`VITE_DEMO_MODE=true`인 로컬 시연 모드는 브라우저 저장소 기반이라 실제 인증 수단이 아닙니다. 코드에서 localhost로 제한되어 있으며 배포 환경에서는 반드시 Supabase Auth와 전체 migration을 사용합니다. `supabase/demo_seed.sql`은 기존 지원 데이터를 삭제하므로 폐기 가능한 시연 프로젝트에서만 수동 실행하세요.
+
 ## 환경변수
 
 `.env.example`을 참고해 `.env.local`에 다음 값을 넣습니다.

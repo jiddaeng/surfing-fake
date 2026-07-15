@@ -25,7 +25,7 @@ export function ApplyPage() {
   useEffect(() => {
     if (!existing) return
     setAnswers(existing.answers)
-  }, [existing?.id])
+  }, [existing])
 
   if (!club || profile?.role !== 'student') return <div className="card mx-auto max-w-xl p-8 text-center"><AlertTriangle className="mx-auto text-amber-500" /><h1 className="mt-3 font-bold">지원서를 작성할 수 없어요</h1><Link to="/clubs" className="mt-5 inline-flex"><Button variant="secondary">동아리 목록</Button></Link></div>
   if (existing && existing.status !== 'draft') return <div className="card mx-auto max-w-xl p-8 text-center"><Check className="mx-auto text-emerald-500" /><h1 className="mt-3 font-bold">이미 제출한 지원서예요</h1><p className="mt-2 text-sm text-gray-500">제출한 지원서는 수정하거나 취소할 수 없습니다.</p><Link to="/applications" className="mt-5 inline-flex"><Button>지원 현황 보기</Button></Link></div>
@@ -42,7 +42,9 @@ export function ApplyPage() {
       const answer = answers[question.id]
       if (question.required && (!answer || (Array.isArray(answer) ? answer.length === 0 : !answer.trim()))) nextErrors[question.id] = '필수 질문에 답변해주세요.'
       if (question.type === 'link' && answer && typeof answer === 'string') {
-        try { new URL(answer) } catch { nextErrors[question.id] = 'https://로 시작하는 올바른 주소를 입력해주세요.' }
+        try {
+          if (new URL(answer).protocol !== 'https:') throw new Error('HTTPS required')
+        } catch { nextErrors[question.id] = 'https://로 시작하는 올바른 주소를 입력해주세요.' }
       }
     })
     setErrors(nextErrors)
@@ -89,8 +91,8 @@ export function ApplyPage() {
 }
 
 function QuestionInput({ question, value, onChange }: { question: any; value: AnswerValue | undefined; onChange: (value: AnswerValue) => void }) {
-  if (question.type === 'long') return <textarea value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} className={`${textareaClass} min-h-36`} placeholder="답변을 입력해주세요" />
-  if (question.type === 'short' || question.type === 'link') return <input type={question.type === 'link' ? 'url' : 'text'} value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} className={inputClass} placeholder={question.type === 'link' ? 'https://example.com' : '답변을 입력해주세요'} />
+  if (question.type === 'long') return <textarea maxLength={5000} value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} className={`${textareaClass} min-h-36`} placeholder="답변을 입력해주세요" />
+  if (question.type === 'short' || question.type === 'link') return <input maxLength={question.type === 'link' ? 2048 : 500} type={question.type === 'link' ? 'url' : 'text'} value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)} className={inputClass} placeholder={question.type === 'link' ? 'https://example.com' : '답변을 입력해주세요'} />
   if (question.type === 'single') return <div className="space-y-2">{question.options?.map((option: string) => <label key={option} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-sm transition ${value === option ? 'border-brand-300 bg-brand-50' : 'border-gray-200 hover:bg-gray-50'}`}><input type="radio" name={question.id} checked={value === option} onChange={() => onChange(option)} className="accent-brand-600" />{option}</label>)}</div>
   const selected = Array.isArray(value) ? value : []
   return <div className="space-y-2">{question.options?.map((option: string) => <label key={option} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-sm transition ${selected.includes(option) ? 'border-brand-300 bg-brand-50' : 'border-gray-200 hover:bg-gray-50'}`}><input type="checkbox" checked={selected.includes(option)} onChange={() => onChange(selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option])} className="accent-brand-600" />{option}</label>)}</div>

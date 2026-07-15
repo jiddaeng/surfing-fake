@@ -74,7 +74,7 @@ create table if not exists public.application_questions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (
-    (type in ('single', 'multiple') and jsonb_typeof(options) = 'array')
+    (type in ('single', 'multiple') and options is not null and jsonb_typeof(options) = 'array')
     or (type not in ('single', 'multiple') and options is null)
   )
 );
@@ -151,7 +151,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select role from public.profiles where id = (select auth.uid());
+  select role from public.profiles where id = (select auth.uid()) and is_active;
 $$;
 
 create or replace function public.is_admin()
@@ -185,6 +185,9 @@ as $$
   );
 $$;
 
+revoke all on function public.current_user_role() from public, anon, authenticated;
+revoke all on function public.is_admin() from public, anon, authenticated;
+revoke all on function public.is_club_leader(uuid) from public, anon, authenticated;
 grant execute on function public.current_user_role() to authenticated;
 grant execute on function public.is_admin() to anon, authenticated;
 grant execute on function public.is_club_leader(uuid) to authenticated;
@@ -395,8 +398,11 @@ with check (
 );
 drop policy if exists "clubs_owner_update" on public.clubs;
 create policy "clubs_owner_update" on public.clubs for update to authenticated
-using (leader_id = (select auth.uid()) or (select public.is_admin()))
-with check (leader_id = (select auth.uid()) or (select public.is_admin()));
+using ((select public.is_club_leader(id)) or (select public.is_admin()))
+with check (
+  (leader_id = (select auth.uid()) and (select public.current_user_role()) = 'leader')
+  or (select public.is_admin())
+);
 drop policy if exists "clubs_admin_delete" on public.clubs;
 create policy "clubs_admin_delete" on public.clubs for delete to authenticated
 using ((select public.is_admin()));
@@ -427,7 +433,7 @@ create policy "students_create_application" on public.applications for insert to
 with check (
   user_id = (select auth.uid())
   and (select public.current_user_role()) = 'student'
-  and status in ('draft', 'submitted')
+  and status = 'draft'
 );
 drop policy if exists "student_or_leader_update_application" on public.applications;
 create policy "student_or_leader_update_application" on public.applications for update to authenticated
@@ -436,8 +442,13 @@ using (
   or (select public.is_club_leader(club_id))
 )
 with check (
-  user_id = (select auth.uid())
-  or (select public.is_club_leader(club_id))
+  (
+    user_id = (select auth.uid())
+    and status in ('draft', 'submitted')
+    and (select public.current_user_role()) = 'student'
+  )
+  or ((select public.is_club_leader(club_id)) and status in ('submitted', 'reviewing'))
+  or ((select public.is_admin()) and status in ('submitted', 'reviewing'))
 );
 
 drop policy if exists "decisions_read_allowed" on public.application_decisions;
@@ -495,7 +506,9 @@ using (exists (
 drop policy if exists "students_insert_draft_answers" on public.application_answers;
 create policy "students_insert_draft_answers" on public.application_answers for insert to authenticated
 with check (exists (
-  select 1 from public.applications a
+  select 1
+  from public.applications a
+  join public.application_questions q on q.id = question_id and q.club_id = a.club_id
   where a.id = application_id and a.user_id = (select auth.uid()) and a.status = 'draft'
 ));
 drop policy if exists "students_update_draft_answers" on public.application_answers;
@@ -505,6 +518,15 @@ using (exists (
   where a.id = application_id and a.user_id = (select auth.uid()) and a.status = 'draft'
 ))
 with check (exists (
+  select 1
+  from public.applications a
+  join public.application_questions q on q.id = question_id and q.club_id = a.club_id
+  where a.id = application_id and a.user_id = (select auth.uid()) and a.status = 'draft'
+));
+
+drop policy if exists "students_delete_draft_answers" on public.application_answers;
+create policy "students_delete_draft_answers" on public.application_answers for delete to authenticated
+using (exists (
   select 1 from public.applications a
   where a.id = application_id and a.user_id = (select auth.uid()) and a.status = 'draft'
 ));
@@ -534,7 +556,7 @@ values (
   'club-logos',
   true,
   2097152,
-  array['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
+  array['image/jpeg', 'image/png', 'image/webp']
 )
 on conflict (id) do update set
   public = excluded.public,
@@ -581,8 +603,18 @@ using (
   )
 );
 
--- 테이블 권한. 실제 접근 가능 행은 위 RLS 정책이 한 번 더 제한합니다.
+-- 최소 테이블 권한. 실제 접근 가능 행은 위 RLS 정책이 한 번 더 제한합니다.
 grant select on public.recruitment_settings, public.clubs, public.application_questions to anon;
-grant select, insert, update, delete on all tables in schema public to authenticated;
+grant select on
+  public.profiles, public.recruitment_settings, public.clubs, public.application_questions,
+  public.applications, public.application_decisions, public.application_answers,
+  public.favorites, public.notifications
+to authenticated;
+grant update on public.profiles, public.recruitment_settings to authenticated;
+grant insert, update, delete on public.clubs, public.application_questions to authenticated;
+grant insert, update on public.applications to authenticated;
+grant insert, update, delete on public.application_decisions, public.application_answers to authenticated;
+grant insert, delete on public.favorites to authenticated;
+grant update (read) on public.notifications to authenticated;
 
 select 'DIMI CLUB 데이터베이스 초기 설정이 완료되었습니다.' as result;

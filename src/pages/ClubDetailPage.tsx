@@ -1,11 +1,10 @@
 import { ArrowLeft, CalendarClock, Heart, UserRound, Users } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { Badge, Button, EmptyState } from '../components/ui'
 import { ClubLogo } from '../components/ClubLogo'
+import { SafeMarkdown } from '../components/SafeMarkdown'
 import { daysUntil, formatFullDate, isRecruiting } from '../lib/utils'
 
 export function ClubDetailPage() {
@@ -33,7 +32,7 @@ export function ClubDetailPage() {
             </div>
           </section>
 
-          <section className="card mt-5 p-5 sm:p-8"><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{club.description}</ReactMarkdown></div></section>
+          <section className="card mt-5 p-5 sm:p-8"><div className="markdown"><SafeMarkdown>{club.description}</SafeMarkdown></div></section>
         </div>
 
         <aside className="lg:sticky lg:top-24 lg:self-start">

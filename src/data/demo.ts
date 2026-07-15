@@ -1,13 +1,13 @@
 import type { Club, DemoStore, Profile } from '../types'
 
-export const DEMO_PASSWORD = 'demo1234'
+export const DEMO_PASSWORD = 'local-demo-only'
 
 export const DEMO_ACCOUNTS: Array<Profile & { password: string }> = [
   {
     id: '10000000-0000-0000-0000-000000000001',
     email: 'student@dimigo.hs.kr',
     password: DEMO_PASSWORD,
-    name: '안지호',
+    name: '시연 학생',
     studentNumber: '1301',
     role: 'student',
     isActive: true,
@@ -16,7 +16,7 @@ export const DEMO_ACCOUNTS: Array<Profile & { password: string }> = [
     id: '10000000-0000-0000-0000-000000000002',
     email: 'leader@dimigo.hs.kr',
     password: DEMO_PASSWORD,
-    name: '김하늘',
+    name: '시연 동아리장',
     studentNumber: '2407',
     role: 'leader',
     isActive: true,
@@ -33,12 +33,33 @@ export const DEMO_ACCOUNTS: Array<Profile & { password: string }> = [
     id: '10000000-0000-0000-0000-000000000006',
     email: 'newleader@dimigo.hs.kr',
     password: DEMO_PASSWORD,
-    name: '이서윤',
+    name: '신규 동아리장',
     studentNumber: '2501',
     role: 'leader',
     isActive: true,
   },
 ]
+
+const demoAccountsKey = 'surfing-fake:demo-accounts'
+
+export const readDemoAccounts = (): Array<Profile & { password: string }> => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(demoAccountsKey) || '[]')
+    const overrides = Array.isArray(saved) ? saved : []
+    return [
+      ...DEMO_ACCOUNTS.filter((account) => !overrides.some((override) => override?.id === account.id)),
+      ...overrides,
+    ]
+  } catch {
+    return DEMO_ACCOUNTS
+  }
+}
+
+export const saveDemoAccount = (account: Profile & { password: string }) => {
+  const customAccounts = readDemoAccounts()
+    .filter((item) => !DEMO_ACCOUNTS.some((base) => base.id === item.id) && item.id !== account.id)
+  localStorage.setItem(demoAccountsKey, JSON.stringify([...customAccounts, account]))
+}
 
 const day = (offset: number, hour = 18) => {
   const date = new Date()
@@ -63,7 +84,7 @@ const clubs: Club[] = clubNames.map((name, index) => ({
   color: colors[index],
   capacity: 10,
   leaderId: index === 0 ? '10000000-0000-0000-0000-000000000002' : `10000000-0000-0000-0000-0000000000${index + 10}`,
-  leaderName: index === 0 ? '김하늘' : '담당 동아리장',
+  leaderName: index === 0 ? '시연 동아리장' : '담당 동아리장',
   isPublished: true,
   createdAt: day(-30 + index),
 }))
@@ -77,7 +98,7 @@ export const createDemoStore = (): DemoStore => ({
     {
       id: '10000000-0000-0000-0000-000000000004',
       email: 'student2@dimigo.hs.kr',
-      name: '박서연',
+      name: '지원자 A',
       studentNumber: '1512',
       role: 'student',
       isActive: true,
@@ -85,7 +106,7 @@ export const createDemoStore = (): DemoStore => ({
     {
       id: '10000000-0000-0000-0000-000000000005',
       email: 'student3@dimigo.hs.kr',
-      name: '이도윤',
+      name: '지원자 B',
       studentNumber: '2211',
       role: 'student',
       isActive: true,
