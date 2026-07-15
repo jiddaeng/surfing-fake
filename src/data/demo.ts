@@ -1,7 +1,7 @@
 import type { Club, DemoStore, Profile } from '../types'
 import { CLUB_CATALOG, catalogDescription, catalogSummary } from './clubs'
 
-export const DEMO_PASSWORD = 'local-demo-only'
+export const DEMO_PASSWORD = 'demo1234'
 
 export const DEMO_ACCOUNTS: Array<Profile & { password: string }> = [
   {
@@ -46,7 +46,11 @@ const demoAccountsKey = 'surfing-fake:demo-accounts'
 export const readDemoAccounts = (): Array<Profile & { password: string }> => {
   try {
     const saved = JSON.parse(localStorage.getItem(demoAccountsKey) || '[]')
-    const overrides = Array.isArray(saved) ? saved : []
+    const overrides = (Array.isArray(saved) ? saved : []).map((override) =>
+      DEMO_ACCOUNTS.some((account) => account.id === override?.id)
+        ? { ...override, password: DEMO_PASSWORD }
+        : override,
+    )
     return [
       ...DEMO_ACCOUNTS.filter((account) => !overrides.some((override) => override?.id === account.id)),
       ...overrides,

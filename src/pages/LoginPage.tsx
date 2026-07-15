@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { Brand } from '../components/Layout'
 import { Button, inputClass } from '../components/ui'
 import { ThemeToggle } from '../components/ThemeToggle'
-import { isDemoMode } from '../lib/supabase'
+import { DEMO_PASSWORD } from '../data/demo'
 
 const demoAccounts = [
   { role: '학생', loginId: 'student', color: 'bg-brand-50 text-brand-700' },
@@ -16,7 +16,7 @@ const demoAccounts = [
 
 export function LoginPage() {
   const { signIn, configured } = useAuth()
-  const [loginId, setLoginId] = useState(isDemoMode ? 'student' : '')
+  const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -28,8 +28,9 @@ export function LoginPage() {
     setLoading(true)
     setError('')
     try {
-      await signIn(loginId, password)
-      navigate('/')
+      const result = await signIn(loginId, password)
+      if (result.requiresReload) window.location.replace('/')
+      else navigate('/')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : '로그인하지 못했습니다.')
     } finally {
@@ -57,15 +58,16 @@ export function LoginPage() {
 
           <p className="mt-5 text-center text-sm text-gray-500">처음 이용하시나요? <Link to="/signup" className="font-bold text-brand-600 hover:text-brand-700">학생 회원가입</Link></p>
 
-          {isDemoMode && <><div className="my-6 flex items-center gap-3"><span className="h-px flex-1 bg-gray-200" /><span className="text-[11px] font-semibold text-gray-400">로컬 시연 계정 선택</span><span className="h-px flex-1 bg-gray-200" /></div>
+          <div className="my-6 flex items-center gap-3"><span className="h-px flex-1 bg-gray-200" /><span className="text-[11px] font-semibold text-gray-400">시연 계정 선택</span><span className="h-px flex-1 bg-gray-200" /></div>
+          <p className="mb-3 rounded-xl bg-brand-50 px-3 py-2 text-center text-xs font-semibold text-brand-700">시연 계정 공통 비밀번호: {DEMO_PASSWORD}</p>
           <div className="space-y-2">
             {demoAccounts.map((account) => (
-              <button key={account.loginId} type="button" onClick={() => setLoginId(account.loginId)} className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left transition ${loginId === account.loginId ? 'border-brand-300 bg-brand-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
+              <button key={account.loginId} type="button" onClick={() => { setLoginId(account.loginId); setPassword(DEMO_PASSWORD) }} className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left transition ${loginId === account.loginId ? 'border-brand-300 bg-brand-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
                 <span><strong className="block text-sm">{account.role} 계정</strong><span className="mt-0.5 block text-xs text-gray-500">ID: {account.loginId}</span></span>
                 <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${account.color}`}>{account.role}</span>
               </button>
             ))}
-          </div></>}
+          </div>
           <p className="mt-5 flex items-start gap-2 rounded-xl bg-gray-50 p-3 text-[11px] leading-5 text-gray-500"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-brand-600" /> 계정과 지원서는 Supabase의 역할별 보안 정책으로 보호됩니다.</p>
         </div>
       </div>

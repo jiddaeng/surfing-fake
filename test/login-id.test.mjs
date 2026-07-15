@@ -29,3 +29,19 @@ test('admin can synchronize the official catalog without a database migration', 
   assert.match(data, /LEGACY_DEMO_CLUB_NAMES/)
   assert.match(data, /\.upsert\(rows, \{ onConflict: 'name' \}\)/)
 })
+
+test('deployed login offers isolated demo accounts with the requested password', async () => {
+  const [login, auth, demo, supabaseClient] = await Promise.all([
+    read('src/pages/LoginPage.tsx'),
+    read('src/context/AuthContext.tsx'),
+    read('src/data/demo.ts'),
+    read('src/lib/supabase.ts'),
+  ])
+  assert.match(demo, /DEMO_PASSWORD = 'demo1234'/)
+  assert.match(login, /시연 계정 공통 비밀번호/)
+  assert.doesNotMatch(login, /isDemoMode &&/)
+  assert.match(login, /setPassword\(DEMO_PASSWORD\)/)
+  assert.match(auth, /DEMO_MODE_OVERRIDE_KEY/)
+  assert.match(auth, /return \{ requiresReload: true \}/)
+  assert.match(supabaseClient, /Demo roles never receive a Supabase session/)
+})

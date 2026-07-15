@@ -1,20 +1,24 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Profile } from '../types'
 import { isDemoMode, isSupabaseConfigured, supabase } from '../lib/supabase'
-import { readDemoAccounts, saveDemoAccount } from '../data/demo'
+import { DEMO_ACCOUNTS, DEMO_PASSWORD, readDemoAccounts, saveDemoAccount } from '../data/demo'
+import { DEMO_MODE_OVERRIDE_KEY, DEMO_SESSION_KEY } from '../lib/demoSession'
+
+interface AuthActionResult {
+  requiresReload: boolean
+}
 
 interface AuthContextValue {
   profile: Profile | null
   loading: boolean
   configured: boolean
-  signIn: (loginId: string, password: string) => Promise<void>
+  signIn: (loginId: string, password: string) => Promise<AuthActionResult>
   signUp: (name: string, studentNumber: string, password: string) => Promise<{ requiresApproval: boolean }>
-  signOut: () => Promise<void>
+  signOut: () => Promise<AuthActionResult>
   refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
-const demoSessionKey = 'surfing-fake:demo-session'
 const toInternalEmail = (loginId: string) => {
   const normalized = loginId.trim().toLowerCase()
   return normalized.includes('@') ? normalized : `${normalized}@dimigo.hs.kr`
@@ -36,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadProfile = async (userId?: string) => {
     if (isDemoMode) {
-      const id = userId || localStorage.getItem(demoSessionKey)
+      const id = userId || localStorage.getItem(DEMO_SESSION_KEY)
       const account = readDemoAccounts().find((item) => item.id === id)
       if (!account) {
         setProfile(null)
@@ -96,14 +100,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (loginId: string, password: string) => {
     const email = toInternalEmail(loginId)
+
+    if (!isDemoMode) {
+      const demoAccount = DEMO_ACCOUNTS.find((item) => item.email.toLowerCase() === email)
+      if (demoAccount && password === DEMO_PASSWORD) {
+        if (supabase) await supabase.auth.signOut()
+        localStorage.setItem(DEMO_MODE_OVERRIDE_KEY, 'true')
+        localStorage.setItem(DEMO_SESSION_KEY, demoAccount.id)
+        return { requiresReload: true }
+      }
+    }
+
     if (isDemoMode) {
       const account = readDemoAccounts().find((item) => item.email.toLowerCase() === email && item.password === password)
       if (!account) throw new Error('로그인 ID 또는 비밀번호를 확인해주세요.')
-      localStorage.setItem(demoSessionKey, account.id)
+      localStorage.setItem(DEMO_SESSION_KEY, account.id)
       const { password: _password, ...nextProfile } = account
       void _password
       setProfile(nextProfile)
-      return
+      return { requiresReload: false }
     }
     if (!supabase) throw new Error('Supabase 환경변수가 설정되지 않았습니다.')
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -112,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('로그인 ID 또는 비밀번호를 확인해주세요.')
     }
     await loadProfile(data.user.id)
+    return { requiresReload: false }
   }
 
   const signUp = async (name: string, studentNumber: string, password: string) => {
@@ -128,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isActive: true,
       }
       saveDemoAccount(account)
-      localStorage.setItem(demoSessionKey, account.id)
+      localStorage.setItem(DEMO_SESSION_KEY, account.id)
       const { password: _password, ...nextProfile } = account
       void _password
       setProfile(nextProfile)
@@ -158,9 +174,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    if (isDemoMode) localStorage.removeItem(demoSessionKey)
+    if (isDemoMode) {
+      localStorage.removeItem(DEMO_SESSION_KEY)
+      localStorage.removeItem(DEMO_MODE_OVERRIDE_KEY)
+      setProfile(null)
+      return { requiresReload: true }
+    }
     if (supabase) await supabase.auth.signOut()
     setProfile(null)
+    return { requiresReload: false }
   }
 
   const value: AuthContextValue = {

@@ -81,8 +81,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const unread = notifications.filter((item) => !item.read).length
 
   const handleSignOut = async () => {
-    await signOut()
-    navigate('/')
+    const result = await signOut()
+    if (result.requiresReload) window.location.replace('/')
+    else navigate('/')
   }
 
   return (
