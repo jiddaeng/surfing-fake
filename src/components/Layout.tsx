@@ -43,7 +43,7 @@ export function Brand() {
     <Link to="/" className="focus-ring flex items-center gap-2.5 rounded-xl">
       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-sm font-black tracking-tighter text-white shadow-md shadow-brand-200">DC</span>
       <span className="leading-none">
-        <strong className="block text-[15px] font-black tracking-tight text-gray-950">DIMI CLUB</strong>
+        <strong className="block text-[15px] font-black tracking-tight text-gray-950">SURFING</strong>
         <span className="mt-1 block text-[10px] font-semibold tracking-widest text-gray-400">동아리 지원 서비스</span>
       </span>
     </Link>
