@@ -3,6 +3,8 @@
 
 begin;
 
+create extension if not exists pgcrypto with schema extensions;
+
 create or replace function public.list_pending_accounts()
 returns table (
   user_id uuid,
@@ -69,16 +71,38 @@ grant execute on function public.list_pending_accounts() to authenticated;
 grant execute on function public.approve_account(uuid) to authenticated;
 
 -- 배포용 시연 계정도 실제 Supabase 계정으로 우선 로그인할 수 있게 맞춥니다.
-update auth.users
-set encrypted_password = crypt('demo1234', gen_salt('bf')),
-    email_confirmed_at = coalesce(email_confirmed_at, clock_timestamp()),
-    updated_at = clock_timestamp()
-where lower(email) in (
-  'student@dimigo.hs.kr',
-  'leader@dimigo.hs.kr',
-  'newleader@dimigo.hs.kr',
-  'admin@dimigo.hs.kr'
-);
+-- pgcrypto가 설치된 실제 스키마를 찾아 호출하므로 프로젝트 설정과 무관하게 동작합니다.
+do $password_reset$
+declare
+  crypto_schema text;
+begin
+  select namespace.nspname
+  into crypto_schema
+  from pg_extension as ext
+  join pg_namespace as namespace on namespace.oid = ext.extnamespace
+  where ext.extname = 'pgcrypto';
+
+  if crypto_schema is null then
+    raise exception 'pgcrypto 확장을 찾지 못했습니다.';
+  end if;
+
+  execute format(
+    'update auth.users
+     set encrypted_password = %1$I.crypt(%2$L, %1$I.gen_salt(''bf'')),
+         email_confirmed_at = coalesce(email_confirmed_at, clock_timestamp()),
+         updated_at = clock_timestamp()
+     where lower(email) = any (%3$L::text[])',
+    crypto_schema,
+    'demo1234',
+    array[
+      'student@dimigo.hs.kr',
+      'leader@dimigo.hs.kr',
+      'newleader@dimigo.hs.kr',
+      'admin@dimigo.hs.kr'
+    ]
+  );
+end;
+$password_reset$;
 
 update public.profiles
 set role = 'admin', is_active = true

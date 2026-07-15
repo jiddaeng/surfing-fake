@@ -63,5 +63,7 @@ test('admin can list and approve pending Supabase accounts', async () => {
   assert.match(sql, /update auth\.users as target/i)
   assert.match(sql, /email_confirmed_at/i)
   assert.match(sql, /revoke all on function public\.approve_account\(uuid\)/i)
-  assert.match(sql, /encrypted_password = crypt\('demo1234'/i)
+  assert.match(sql, /where ext\.extname = 'pgcrypto'/i)
+  assert.match(sql, /encrypted_password = %1\$I\.crypt\(%2\$L/i)
+  assert.match(sql, /'demo1234'/i)
 })
