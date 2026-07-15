@@ -56,4 +56,8 @@ test('club screens use the shared category catalog and refresh demo data', async
   assert.match(clubsPage, /\['전체', \.\.\.CLUB_CATEGORIES\]/)
   assert.match(dashboard, /\['전체', \.\.\.CLUB_CATEGORIES\]/)
   assert.match(dataContext, /demo-store:v2/)
+  assert.match(dataContext, /const persistedClubsFromRows = \(rows: any\[\]\): Club\[\] => rows\.map\(mapClub\)/)
+  assert.doesNotMatch(dataContext, /createdAt: new Date\(0\)\.toISOString\(\)/)
+  assert.match(dataContext, /setQuestions\(mappedQuestions\)/)
+  assert.match(dataContext, /\.eq\('leader_id', profile\.id\)\s*\.maybeSingle\(\)/)
 })

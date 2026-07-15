@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Profile } from '../types'
 import { isDemoMode, isSupabaseConfigured, supabase } from '../lib/supabase'
-import { DEMO_ACCOUNTS, DEMO_PASSWORD, readDemoAccounts, saveDemoAccount } from '../data/demo'
+import { readDemoAccounts, saveDemoAccount } from '../data/demo'
 import { DEMO_MODE_OVERRIDE_KEY, DEMO_SESSION_KEY } from '../lib/demoSession'
 
 interface AuthActionResult {
@@ -101,23 +101,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (loginId: string, password: string) => {
     const email = toInternalEmail(loginId)
 
-    if (!isDemoMode) {
-      const demoAccount = DEMO_ACCOUNTS.find((item) => item.email.toLowerCase() === email)
-      if (demoAccount && password === DEMO_PASSWORD) {
-        if (supabase) {
-          const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-          if (!error && data.user) {
-            await loadProfile(data.user.id)
-            return { requiresReload: false }
-          }
-          await supabase.auth.signOut()
-        }
-        localStorage.setItem(DEMO_MODE_OVERRIDE_KEY, 'true')
-        localStorage.setItem(DEMO_SESSION_KEY, demoAccount.id)
-        return { requiresReload: true }
-      }
-    }
-
     if (isDemoMode) {
       const account = readDemoAccounts().find((item) => item.email.toLowerCase() === email && item.password === password)
       if (!account) throw new Error('로그인 ID 또는 비밀번호를 확인해주세요.')
@@ -181,9 +164,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    localStorage.removeItem(DEMO_SESSION_KEY)
+    localStorage.removeItem(DEMO_MODE_OVERRIDE_KEY)
     if (isDemoMode) {
-      localStorage.removeItem(DEMO_SESSION_KEY)
-      localStorage.removeItem(DEMO_MODE_OVERRIDE_KEY)
       setProfile(null)
       return { requiresReload: true }
     }
