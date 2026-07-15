@@ -563,11 +563,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!supabase) throw new Error('Supabase 연결이 필요합니다.')
     const { data, error } = await supabase
       .rpc('promote_student_to_leader', { target_profile_id: profileId })
+    let row: any = Array.isArray(data) ? data[0] : data
     if (error) {
-      if (error.code === 'PGRST202') throw new Error('Supabase에 동아리장 승격 migration(004)을 먼저 적용해주세요.')
-      throw new Error(error.message || '계정 역할을 변경하지 못했습니다.')
+      if (error.code !== 'PGRST202') throw new Error(error.message || '계정 역할을 변경하지 못했습니다.')
+      const { data: updated, error: updateError } = await supabase
+        .from('profiles')
+        .update({ role: 'leader' })
+        .eq('id', profileId)
+        .eq('role', 'student')
+        .select()
+        .single()
+      if (updateError) throw new Error(updateError.message || '계정 역할을 변경하지 못했습니다.')
+      row = updated
     }
-    const row = Array.isArray(data) ? data[0] : data
     if (!row || row.role !== 'leader') throw new Error('승격 결과를 확인하지 못했습니다. 다시 시도해주세요.')
     setProfiles((items) => items.map((item) => (item.id === profileId ? mapProfile(row) : item)))
   }

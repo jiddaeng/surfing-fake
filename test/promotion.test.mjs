@@ -17,6 +17,8 @@ test('leader promotion uses an admin-only database function and verifies its res
   assert.match(sql, /target\.role\s*=\s*'student'/i)
   assert.match(sql, /grant execute on function public\.promote_student_to_leader\(uuid\) to authenticated/i)
   assert.match(context, /\.rpc\('promote_student_to_leader'/)
+  assert.match(context, /error\.code !== 'PGRST202'/)
+  assert.match(context, /\.from\('profiles'\)[\s\S]*\.update\(\{ role: 'leader' \}\)/)
   assert.match(context, /row\.role !== 'leader'/)
 })
 
