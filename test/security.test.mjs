@@ -14,6 +14,7 @@ test('production deployment disables localStorage demo authentication and sets b
   ])
   assert.match(render, /VITE_DEMO_MODE\s*\r?\n\s*value: "false"/)
   assert.match(render, /Content-Security-Policy/)
+  assert.match(render, /Cache-Control\s*\r?\n\s*value: "no-store, no-cache, must-revalidate, max-age=0"/)
   assert.match(render, /frame-ancestors 'none'/)
   assert.match(render, /X-Content-Type-Options/)
   assert.match(supabaseClient, /\['localhost', '127\.0\.0\.1', '::1'\]/)
